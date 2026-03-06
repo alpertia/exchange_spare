@@ -1,7 +1,8 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
-  /* config options here */
-};
+  // Turbopack disabled — removes the floating "N" indicator in dev mode
+  // experimental: { turbo: {} }  ← intentionally omitted
+}
 
-export default nextConfig;
+export default nextConfig

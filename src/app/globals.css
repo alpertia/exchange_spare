@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+body {
+  margin: 0;
+  padding: 0;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: 'DM Sans', 'Helvetica Neue', Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+input, select, textarea, button {
+  font-family: inherit;
+}
+
+/* Sidebar dark theme override */
+.sidebar-wrapper {
+  color: #f1f5f9 !important;
+}
+.sidebar-wrapper * {
+  color: inherit;
+}
+.sidebar-wrapper a {
+  color: #64748b !important;
+}
+.sidebar-wrapper a.active-nav {
+  color: #f1f5f9 !important;
+}
