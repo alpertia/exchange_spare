@@ -3,19 +3,18 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
-import Logo from "@/components/Logo"
 
 const navItems = [
-  { label: "Marketplace",             href: "/dashboard/marketplace" },
-  { label: "My Stock",   href: "/dashboard/selling" },
-  { label: "My Inquiries",            href: "/dashboard/buy-inquiries" },
-  { label: "My CART",                 href: "/dashboard/buying" },
-  { label: "My Messages",             href: "/dashboard/messages" },
-  { label: "My Transactions",         href: "/dashboard/transactions" },
-  { label: "Product Knowledge Base",  href: "/dashboard/knowledge" },
-  { label: "My Balance",              href: "/dashboard/escrow" },
-  { label: "My Profile",              href: "/dashboard/profile" },
-  { label: "Settings",                href: "/dashboard/settings" },
+  { label: "Marketplace",        href: "/dashboard/marketplace" },
+  { label: "My SELL Listings",   href: "/dashboard/selling" },
+  { label: "My BUY Intents",     href: "/dashboard/buy-intents" },
+  { label: "My CART",            href: "/dashboard/buying" },
+  { label: "My Messages",        href: "/dashboard/messages" },
+  { label: "My Transactions",    href: "/dashboard/transactions" },
+  { label: "Product Knowledge Base", href: "/dashboard/knowledge" },
+  { label: "My Trade Assurance",  href: "/dashboard/escrow" },
+  { label: "My Profile",         href: "/dashboard/profile" },
+  { label: "Settings",           href: "/dashboard/settings" },
 ]
 
 const adminNavItems = [
@@ -28,19 +27,19 @@ const adminNavItems = [
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const router   = useRouter()
+  const router = useRouter()
 
-  const [checking, setChecking]         = useState(true)
-  const [companyName, setCompanyName]   = useState<string | null>(null)
-  const [userEmail, setUserEmail]       = useState<string | null>(null)
-  const [myCompanyId, setMyCompanyId]   = useState<string | null>(null)
-  const [isAdmin, setIsAdmin]           = useState(false)
+  const [checking, setChecking]       = useState(true)
+  const [companyName, setCompanyName] = useState<string | null>(null)
+  const [userEmail, setUserEmail]     = useState<string | null>(null)
+  const [myCompanyId, setMyCompanyId] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin]         = useState(false)
   const [unreadMsgs, setUnreadMsgs]     = useState(0)
   const [adminBadge, setAdminBadge]     = useState(0)
-  const [txBadge, setTxBadge]           = useState(0)
-  const [buyBadge, setBuyBadge]         = useState(0)
-  const [sellBadge, setSellBadge]       = useState(0)
-  const [escrowBalances, setEscrowBalances] = useState<{ currency: string; balance: number }[]>([])
+  const [txBadge, setTxBadge]           = useState(0)   // needs-action tx count
+  const [buyBadge, setBuyBadge]         = useState(0)   // new buy intent matches
+  const [sellBadge, setSellBadge]       = useState(0)   // new sell inquiries
+  const [escrowBalances, setEscrowBalances] = useState<{currency: string; balance: number}[]>([])
 
   useEffect(() => { init() }, [])
 
@@ -64,7 +63,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       loadBuySellBadges(profile.company_id)
     }
 
-    if ((profile as any)?.role === "admin") {
+    if ((profile as any)?.role === 'admin') {
       setIsAdmin(true)
       loadAdminBadge()
     }
@@ -73,9 +72,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   async function loadUnread(companyId: string) {
-    const { count } = await supabase.from("messages")
+    const { count } = await supabase
+      .from("messages")
       .select("*", { count: "exact", head: true })
-      .eq("receiver_company_id", companyId).is("read_at", null)
+      .eq("receiver_company_id", companyId)
+      .is("read_at", null)
     setUnreadMsgs(count || 0)
   }
 
@@ -86,33 +87,41 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       supabase.from("transactions").select("*", { count: "exact", head: true }).eq("status", "disputed"),
       supabase.from("transactions").select("*", { count: "exact", head: true }).eq("escrow_status", "requested"),
     ])
-    setAdminBadge((notifRes.count || 0) + (depositRes.count || 0) + (disputeRes.count || 0) + (escrowRes.count || 0))
+    const total = (notifRes.count || 0) + (depositRes.count || 0) + (disputeRes.count || 0) + (escrowRes.count || 0)
+    setAdminBadge(total)
   }
 
   async function loadTxBadge(companyId: string) {
-    const { data } = await supabase.from("transactions")
-      .select("id, type, status").eq("company_id", companyId)
+    // Transactions where it's MY turn to act
+    const { data } = await supabase
+      .from("transactions")
+      .select("id, type, status")
+      .eq("company_id", companyId)
       .in("status", ["offer_sent", "confirmed", "ready_to_ship", "shipped", "delivered", "disputed"])
     const myTurn = (data || []).filter((t: any) => {
-      const isBuyer = t.type === "buy"
+      const isBuyer = t.type === 'buy'
       return (
-        (t.status === "offer_sent"    && !isBuyer) ||
-        (t.status === "confirmed"     && isBuyer)  ||
-        (t.status === "ready_to_ship" && !isBuyer) ||
-        (t.status === "shipped"       && isBuyer)  ||
-        t.status === "disputed"
+        (t.status === 'offer_sent'    && !isBuyer) ||
+        (t.status === 'confirmed'     && isBuyer)  ||
+        (t.status === 'ready_to_ship' && !isBuyer) ||
+        (t.status === 'shipped'       && isBuyer)  ||
+        t.status === 'disputed'
       )
     })
     setTxBadge(myTurn.length)
   }
 
   async function loadEscrowBalances(companyId: string) {
-    const { data } = await supabase.from("escrow_balances")
-      .select("currency, balance").eq("company_id", companyId).gt("balance", 0)
+    const { data } = await supabase
+      .from("escrow_balances")
+      .select("currency, balance")
+      .eq("company_id", companyId)
+      .gt("balance", 0)
     setEscrowBalances(data || [])
   }
 
   async function loadBuySellBadges(companyId: string) {
+    // Unread buy intents that got new offers
     const [buyRes, sellRes] = await Promise.all([
       supabase.from("transactions").select("*", { count: "exact", head: true })
         .eq("company_id", companyId).eq("type", "buy").eq("status", "offer_sent"),
@@ -153,8 +162,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (checking) {
     return (
-      <div style={{ minHeight: "100vh", background: "#F7F6F2", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', system-ui, sans-serif" }}>
-        <div style={{ color: "#8A8070", fontSize: 13 }}>Loading...</div>
+      <div style={{ minHeight: "100vh", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ color: "#64748b" }}>Loading...</div>
       </div>
     )
   }
@@ -164,16 +173,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return (
       <Link href={href} style={{
         display: "flex", justifyContent: "space-between", alignItems: "center",
-        padding: "8px 12px", borderRadius: 6, textDecoration: "none",
-        background: isActive ? "rgba(10,10,10,0.08)" : "transparent",
-        color: isActive ? "#0A0A0A" : "#5A5545",
-        fontSize: 13, fontWeight: isActive ? 600 : 400,
-        fontFamily: "'DM Sans', system-ui, sans-serif",
+        padding: "9px 12px", borderRadius: "6px", textDecoration: "none",
+        background: isActive ? "#e2e8f0" : "transparent",
+        color: isActive ? "#0f172a" : "#64748b",
+        fontSize: 13,
       }}>
         <span>{label}</span>
         {badge && badge > 0 ? (
-          <span style={{ background: badgeColor || "#ef4444", color: "white", fontSize: 10, padding: "2px 6px", borderRadius: 10, fontWeight: 700 }}>
-            {badge > 99 ? "99+" : badge}
+          <span style={{ background: badgeColor || "#ef4444", color: "white", fontSize: 11, padding: "2px 7px", borderRadius: 12, fontWeight: 600 }}>
+            {badge > 99 ? '99+' : badge}
           </span>
         ) : null}
       </Link>
@@ -181,62 +189,63 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", fontFamily: "'DM Sans', system-ui, sans-serif", background: "#F7F6F2" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&display=swap');
-        * { box-sizing: border-box; }
-        body { background: #F7F6F2; margin: 0; }
-      `}</style>
-
+    <div style={{ display: "flex", minHeight: "100vh" }}>
       {/* SIDEBAR */}
-      <div style={{ width: 220, background: "#EEEBE3", borderRight: "1px solid rgba(0,0,0,0.08)", display: "flex", flexDirection: "column", flexShrink: 0, height: "100vh", position: "sticky", top: 0, overflow: "hidden" }}>
+      <div style={{ width: "220px", background: "#f8fafc", borderRight: "1px solid #e2e8f0", display: "flex", flexDirection: "column", flexShrink: 0, height: "100vh", position: "sticky", top: 0, overflow: "hidden" }}>
 
-        {/* Logo */}
-        <div style={{ padding: "20px 16px 14px", borderBottom: "1px solid rgba(0,0,0,0.08)" }}>
-          <Logo size={28} linkTo="/" />
+        <div style={{ padding: "24px 20px 16px", borderBottom: "1px solid #e2e8f0" }}>
+<Link href="/" style={{ textDecoration: "none", display: "block" }}>
+  <div style={{ fontSize: 22, letterSpacing: "-0.02em", lineHeight: 1, fontFamily: "'DM Serif Display', serif" }}>
+    <span style={{ color: "#0f172a" }}>Spare</span><span style={{ color: "#185FA5" }}>Share</span>
+  </div>
+  <div style={{ fontSize: 9, fontWeight: 600, color: "#15803d", letterSpacing: "0.06em", marginTop: 4, textTransform: "lowercase" }}>with Trade Assurance</div>
+</Link>
+         
         </div>
 
-        {/* Company + user */}
-        <div style={{ padding: "10px 16px", borderBottom: "1px solid rgba(0,0,0,0.08)" }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#0A0A0A", marginBottom: 1 }}>{companyName}</div>
-          <div style={{ fontSize: 11, color: "#8A8070" }}>{userEmail}</div>
+        <div style={{ padding: "12px 16px", borderBottom: "1px solid #e2e8f0" }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#0f172a" }}>{companyName}</div>
+          <div style={{ fontSize: 11, color: "#94a3b8" }}>{userEmail}</div>
           {isAdmin && (
-            <div style={{ fontSize: 10, marginTop: 4, padding: "1px 6px", background: "#fef2f2", color: "#dc2626", borderRadius: 4, display: "inline-block", fontWeight: 700, letterSpacing: "0.04em" }}>
+            <div style={{ fontSize: 10, marginTop: 3, padding: "1px 6px", background: "#fef2f2", color: "#dc2626", borderRadius: 4, display: "inline-block", fontWeight: 700 }}>
               ADMIN
             </div>
           )}
         </div>
 
-        {/* Trade Assurance Balance */}
+        {/* Trade Assurance Balance — prominent, right below account info */}
         {escrowBalances.length > 0 && (
-          <Link href="/dashboard/escrow" style={{ display: "block", padding: "10px 16px", background: "#E4EDE4", borderBottom: "1px solid rgba(0,0,0,0.08)", textDecoration: "none" }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: "#5A5545", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 3 }}>🛡️ Trade Assurance</div>
+          <Link href="/dashboard/escrow" style={{ display: "block", margin: "0", padding: "10px 16px", background: "#f0fdf4", borderBottom: "1px solid #bbf7d0", textDecoration: "none" }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: "#7c3aed", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 4 }}>🔒 Escrow Balance</div>
             {escrowBalances.map(b => (
-              <div key={b.currency} style={{ fontSize: 15, fontWeight: 700, color: "#0A0A0A", lineHeight: 1.3, fontFamily: "'DM Mono', monospace" }}>
-                {b.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
-                <span style={{ fontSize: 10, fontWeight: 600, color: "#5A5545", fontFamily: "'DM Sans', sans-serif" }}>{b.currency}</span>
+              <div key={b.currency} style={{ fontSize: 14, fontWeight: 800, color: "#166534", lineHeight: 1.3 }}>
+                {b.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span style={{ fontSize: 11, fontWeight: 600 }}>{b.currency}</span>
               </div>
             ))}
           </Link>
         )}
 
-        {/* Nav */}
         <nav style={{ padding: "8px", flex: 1, overflowY: "auto", minHeight: 0 }}>
           {navItems.map(item => (
             <NavLink key={item.href} href={item.href} label={item.label}
               badge={
-                item.href === "/dashboard/messages"      ? unreadMsgs :
-                item.href === "/dashboard/transactions"  ? txBadge :
-                item.href === "/dashboard/selling"       ? sellBadge :
-                item.href === "/dashboard/buy-inquiries" ? buyBadge :
+                item.href === "/dashboard/messages"     ? unreadMsgs :
+                item.href === "/dashboard/transactions" ? txBadge :
+                item.href === "/dashboard/selling"      ? sellBadge :
+                item.href === "/dashboard/buy-intents"  ? buyBadge :
                 undefined
               }
-              badgeColor={item.href === "/dashboard/transactions" && txBadge > 0 ? "#f59e0b" : undefined}
+              badgeColor={
+                item.href === "/dashboard/transactions" && txBadge > 0 ? "#f59e0b" :
+                undefined
+              }
             />
           ))}
           {isAdmin && (
             <>
-              <div style={{ margin: "12px 12px 4px", fontSize: 10, fontWeight: 700, color: "#8A8070", textTransform: "uppercase", letterSpacing: "0.07em" }}>Admin</div>
+              <div style={{ margin: "12px 12px 6px", fontSize: 10, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em" }}>
+                Admin
+              </div>
               {adminNavItems.map(item => (
                 <NavLink key={item.href} href={item.href} label={item.label}
                   badge={item.href === "/dashboard/admin/notifications" ? adminBadge : undefined} />
@@ -245,12 +254,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           )}
         </nav>
 
-        {/* Sign out */}
-        <div style={{ padding: "10px 8px", borderTop: "1px solid rgba(0,0,0,0.08)" }}>
+        <div style={{ padding: "10px 8px", borderTop: "1px solid #e2e8f0" }}>
           <button onClick={handleLogout} style={{
             width: "100%", padding: "8px", background: "transparent",
-            border: "1px solid rgba(0,0,0,0.12)", borderRadius: 6, cursor: "pointer",
-            fontSize: 12, color: "#5A5545", fontFamily: "'DM Sans', system-ui, sans-serif",
+            border: "1px solid #e2e8f0", borderRadius: "6px", cursor: "pointer",
+            fontSize: 12, color: "#64748b",
           }}>
             Sign out
           </button>
@@ -258,8 +266,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
 
       {/* MAIN */}
-      <div style={{ flex: 1, background: "#F7F6F2", minWidth: 0 }}>
-        <div style={{ padding: 32 }}>
+      <div style={{ flex: 1, background: "#f8fafc", minWidth: 0 }}>
+        <div style={{ padding: "32px" }}>
           {children}
         </div>
       </div>

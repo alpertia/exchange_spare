@@ -1,13 +1,14 @@
-import { DM_Sans } from "next/font/google"
+import type { Metadata } from 'next'
 
-const dmSans = DM_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"] })
+export const metadata: Metadata = {
+  title: 'SpareShare — B2B Telecom Parts Exchange',
+  description: 'Buy and sell telecom and satellite spare parts with Trade Assurance.',
+}
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={dmSans.className}>
-      <body style={{ margin: 0, padding: 0, background: "#f8fafc" }}>
-        {children}
-      </body>
+    <html lang="en">
+      <body style={{ background: '#F7F6F2', margin: 0 }}>{children}</body>
     </html>
   )
 }

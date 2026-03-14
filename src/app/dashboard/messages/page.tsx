@@ -141,12 +141,26 @@ export default function MessagesPage() {
     if (!active || !cid || !text.trim()) return
     if (hasContact(text)) { setBlocked(true); setTimeout(() => setBlocked(false), 3000); return }
     setSending(true)
+    const msgText = text.trim()
     await supabase.from('messages').insert({
       conversation_id: active.id,
       sender_company_id: cid,
       receiver_company_id: active.other_id,
-      content: text.trim(),
+      content: msgText,
     })
+    // Email notification to receiver
+    fetch('/api/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'new_message',
+        data: {
+          company_id: active.other_id,
+          sender_code: myCode,
+          preview: msgText.length > 200 ? msgText.slice(0, 200) + '...' : msgText,
+        },
+      }),
+    }).catch(() => {})
     setText('')
     setSending(false)
   }

@@ -1,61 +1,107 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+
+async function sendEmail(type: string, data: Record<string, any>) {
+  try {
+    await fetch('/api/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, data }),
+    })
+  } catch (_) { /* non-critical */ }
+}
 import { useRouter } from 'next/navigation'
 
-type TxStatus = 'offer_sent' | 'confirmed' | 'payment_held' | 'dispatched' | 'delivered' | 'completed' | 'cancelled' | 'disputed'
-type EscrowStatus = 'none' | 'requested' | 'held' | 'released' | 'refunded'
+// ─── 6-stage pipeline ─────────────────────────────────────────────────────────
+// offer_sent → confirmed → payment_held → ready_to_ship → shipped → delivered → completed
+// Any stage → disputed → resolved_buyer / resolved_seller / resolved_split
+
+type TxStatus = 'offer_sent' | 'confirmed' | 'payment_held' | 'ready_to_ship' | 'shipped' | 'delivered' | 'completed' | 'cancelled' | 'disputed' | 'resolved_buyer' | 'resolved_seller' | 'resolved_split'
+
+function dealerCode(id: string) {
+  const day = new Date().toISOString().slice(0, 10)
+  let h = 2166136261
+  for (const c of id + day) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); h >>>= 0 }
+  return String((h % 9000) + 1000)
+}
 
 type Tx = {
   id: string; tx_number: string | null; type: 'buy' | 'sell'; status: TxStatus
-  escrow_status: EscrowStatus; escrow_amount: number | null; escrow_currency: string
-  escrow_ref: string | null; escrow_held_at: string | null; escrow_released_at: string | null
+  escrow_status: string; escrow_amount: number | null; escrow_currency: string
+  escrow_held_at: string | null; escrow_released_at: string | null
   payment_terms: string | null; incoterm: string | null
-  shipping_ref: string | null; dispute_reason: string | null
+  tracking_number: string | null; shipping_ref: string | null
+  dispute_reason: string | null; dispute_opened_at: string | null
   quantity: number | null; price: number | null; currency: string
   notes: string | null; created_at: string; updated_at: string
   linked_transaction_id: string | null; counterpart_id: string | null
-  counterpart_name: string; pn: string; brand: string
-  buyer_confirmed: boolean; seller_confirmed: boolean
-  final_confirmed_at: string | null
+  counterpart_name: string; pn: string; brand: string; product_image: string | null
+  dealer_code: string | null
 }
 
+const PIPELINE: TxStatus[] = ['offer_sent', 'confirmed', 'payment_held', 'ready_to_ship', 'shipped', 'delivered', 'completed']
+
 const STATUS_META: Record<string, { label: string; color: string; bg: string; step: number }> = {
-  offer_sent:   { label: 'Offer Sent',    color: '#1d4ed8', bg: '#eff6ff', step: 0 },
-  confirmed:    { label: 'Confirmed',     color: '#15803d', bg: '#f0fdf4', step: 1 },
-  payment_held: { label: 'Payment Held',  color: '#6d28d9', bg: '#f5f3ff', step: 2 },
-  dispatched:   { label: 'Shipped',       color: '#0e7490', bg: '#ecfeff', step: 3 },
-  delivered:    { label: 'Delivered',     color: '#15803d', bg: '#f0fdf4', step: 4 },
-  completed:    { label: 'Completed ✓',   color: '#15803d', bg: '#f0fdf4', step: 5 },
-  cancelled:    { label: 'Cancelled',     color: '#dc2626', bg: '#fef2f2', step: -1 },
-  disputed:     { label: 'Disputed ⚠',   color: '#dc2626', bg: '#fef2f2', step: -1 },
+  offer_sent:      { label: 'Offer Sent',       color: '#1d4ed8', bg: '#eff6ff', step: 0 },
+  confirmed:       { label: 'Confirmed',         color: '#15803d', bg: '#f0fdf4', step: 1 },
+  payment_held:    { label: 'Payment Held',      color: '#6d28d9', bg: '#f5f3ff', step: 2 },
+  ready_to_ship:   { label: 'Ready to Ship',     color: '#0891b2', bg: '#ecfeff', step: 3 },
+  shipped:         { label: 'Shipped',           color: '#0891b2', bg: '#ecfeff', step: 4 },
+  delivered:       { label: 'Delivered',         color: '#15803d', bg: '#f0fdf4', step: 5 },
+  completed:       { label: 'Completed ✓',       color: '#15803d', bg: '#f0fdf4', step: 6 },
+  cancelled:       { label: 'Cancelled',         color: '#dc2626', bg: '#fef2f2', step: -1 },
+  disputed:        { label: 'Disputed ⚠',       color: '#dc2626', bg: '#fef2f2', step: -1 },
+  resolved_buyer:  { label: 'Resolved → Buyer',  color: '#059669', bg: '#ecfdf5', step: -1 },
+  resolved_seller: { label: 'Resolved → Seller', color: '#059669', bg: '#ecfdf5', step: -1 },
+  resolved_split:  { label: 'Resolved → Split',  color: '#059669', bg: '#ecfdf5', step: -1 },
 }
-const PIPELINE: TxStatus[] = ['offer_sent','confirmed','payment_held','dispatched','delivered','completed']
+
+// Action needed for each role at each status
+const NEXT_ACTION: Record<string, { buyer: string; seller: string }> = {
+  offer_sent:    { seller: '⚡ Accept, counter, or decline', buyer: 'Waiting for seller response' },
+  confirmed:     { buyer: '⚡ Make payment to proceed',      seller: 'Waiting for buyer payment' },
+  payment_held:  { buyer: 'Payment confirmed — waiting for admin',  seller: 'Waiting for admin shipment approval' },
+  ready_to_ship: { seller: '⚡ Ship the goods & enter tracking',    buyer: 'Waiting for seller to ship' },
+  shipped:       { buyer: '⚡ Confirm you received the goods',      seller: 'Waiting for buyer delivery confirmation' },
+  delivered:     { buyer: 'Waiting for admin to release escrow',    seller: 'Waiting for admin to release escrow' },
+}
 
 function timeAgo(d: string) {
   const m = Math.floor((Date.now() - new Date(d).getTime()) / 60000)
-  if (m < 60) return `${m}m ago`; if (m < 1440) return `${Math.floor(m/60)}h ago`
+  if (m < 1) return 'just now'
+  if (m < 60) return `${m}m ago`
+  if (m < 1440) return `${Math.floor(m / 60)}h ago`
   return new Date(d).toLocaleDateString()
 }
 
-function Pipeline({ status }: { status: TxStatus }) {
-  if (status === 'cancelled') return <div style={{ marginTop: 8, fontSize: 11, color: '#dc2626', fontWeight: 600 }}>✕ Cancelled</div>
-  if (status === 'disputed')  return <div style={{ marginTop: 8, fontSize: 11, color: '#dc2626', fontWeight: 600 }}>⚠ Under Dispute</div>
+const inp = (extra?: any): any => ({ padding: '8px 11px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#f8fafc', color: '#0f172a', fontSize: 13, outline: 'none', width: '100%', boxSizing: 'border-box', ...extra })
+const lbl: any = { fontSize: 11, color: '#64748b', display: 'block', marginBottom: 3, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }
+
+// ─── Pipeline bar ─────────────────────────────────────────────────────────────
+function PipelineBar({ status }: { status: string }) {
+  const terminal = ['cancelled', 'disputed', 'resolved_buyer', 'resolved_seller', 'resolved_split']
+  const meta = STATUS_META[status]
+  if (terminal.includes(status)) return (
+    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: meta?.bg, color: meta?.color, fontWeight: 700, marginTop: 6, display: 'inline-block' }}>{meta?.label || status}</span>
+  )
   const cur = STATUS_META[status]?.step ?? 0
   return (
-    <div style={{ display: 'flex', alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', alignItems: 'center', marginTop: 8, flexWrap: 'wrap', gap: 1 }}>
       {PIPELINE.map((s, i) => {
-        const step = STATUS_META[s].step; const done = step < cur; const active = step === cur
+        const step = STATUS_META[s].step
+        const done = step < cur; const active = step === cur
         return (
           <div key={s} style={{ display: 'flex', alignItems: 'center' }}>
-            <div style={{ padding: '2px 9px', borderRadius: 4, fontSize: 11, whiteSpace: 'nowrap' as const, fontWeight: active ? 700 : 400,
-              color: done ? '#94a3b8' : active ? STATUS_META[s].color : '#e2e8f0',
+            <div style={{ padding: '2px 7px', borderRadius: 4, fontSize: 10, whiteSpace: 'nowrap',
+              fontWeight: active ? 700 : 400,
+              color: done ? '#94a3b8' : active ? STATUS_META[s].color : '#cbd5e1',
               background: active ? STATUS_META[s].bg : 'transparent',
-              border: `1px solid ${active ? STATUS_META[s].color + '40' : done ? '#f1f5f9' : '#f8fafc'}`,
-              opacity: done ? 0.5 : 1 }}>
-              {done && '✓ '}{STATUS_META[s].label.replace(' ✓','')}
+              border: `1px solid ${active ? STATUS_META[s].color + '40' : done ? '#f1f5f9' : 'transparent'}`,
+              opacity: done ? 0.6 : 1 }}>
+              {done ? '✓ ' : ''}{STATUS_META[s].label.replace(' ✓', '')}
             </div>
-            {i < PIPELINE.length - 1 && <span style={{ color: '#e2e8f0', padding: '0 2px', fontSize: 10 }}>›</span>}
+            {i < PIPELINE.length - 1 && <span style={{ color: '#e2e8f0', fontSize: 9, margin: '0 1px' }}>›</span>}
           </div>
         )
       })}
@@ -63,32 +109,38 @@ function Pipeline({ status }: { status: TxStatus }) {
   )
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
 export default function TransactionsPage() {
   const router = useRouter()
-  const [txs, setTxs] = useState<Tx[]>([])
-  const [loading, setLoading] = useState(true)
-  const [myId, setMyId] = useState<string | null>(null)
+  const [txs, setTxs]           = useState<Tx[]>([])
+  const [loading, setLoading]   = useState(true)
+  const [myId, setMyId]         = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
-  const [activeSection, setActiveSection] = useState<'pending' | 'active' | 'done'>('pending')
-
-  // Final confirmation modal
-  const [finalTx, setFinalTx] = useState<Tx | null>(null)
-  const [finalDocUrl, setFinalDocUrl] = useState('')
-  const [finalNote, setFinalNote] = useState('')
-  const [finalSubmitting, setFinalSubmitting] = useState(false)
-
-  // Escrow request modal
-  const [escrowTx, setEscrowTx] = useState<Tx | null>(null)
-  const [escrowAmount, setEscrowAmount] = useState('')
-  const [escrowRef, setEscrowRef] = useState('')
-  const [escrowBalance, setEscrowBalance] = useState<number>(0)
+  const [section, setSection]   = useState<'pending' | 'active' | 'done'>('pending')
 
   // Counter offer modal
-  const [counterTx, setCounterTx] = useState<Tx | null>(null)
+  const [counterTx, setCounterTx]       = useState<Tx | null>(null)
   const [counterPrice, setCounterPrice] = useState('')
-  const [counterQty, setCounterQty] = useState('')
+  const [counterQty, setCounterQty]     = useState('')
   const [counterNotes, setCounterNotes] = useState('')
-  const [counterSubmitting, setCounterSubmitting] = useState(false)
+
+  // Payment modal
+  const [payTx, setPayTx]             = useState<Tx | null>(null)
+  const [payAmount, setPayAmount]     = useState('')
+  const [payRef, setPayRef]           = useState('')
+  const [useEscrow, setUseEscrow]     = useState(true)
+  const [payBusy, setPayBusy]         = useState(false)
+  const [escrowBal, setEscrowBal]     = useState(0)
+
+  // Tracking modal
+  const [trackTx, setTrackTx]         = useState<Tx | null>(null)
+  const [trackNum, setTrackNum]       = useState('')
+
+  // Dispute modal
+  const [dispTx, setDispTx]           = useState<Tx | null>(null)
+  const [dispReason, setDispReason]   = useState('')
+  const [dispFile, setDispFile]       = useState('')
+  const [dispBusy, setDispBusy]       = useState(false)
 
   useEffect(() => { init() }, [])
 
@@ -98,8 +150,8 @@ export default function TransactionsPage() {
     const { data: p } = await supabase.from('profiles').select('company_id').eq('id', session.user.id).single()
     if (!p?.company_id) return
     setMyId(p.company_id)
-    await fetchTxs(p.company_id)
-    supabase.channel('tx-page')
+    fetchTxs(p.company_id)
+    supabase.channel('tx-v2')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => fetchTxs(p.company_id))
       .subscribe()
   }
@@ -107,7 +159,7 @@ export default function TransactionsPage() {
   async function fetchTxs(cid: string) {
     setLoading(true)
     const { data } = await supabase.from('transactions')
-      .select('*, counterpart:counterpart_id(name), product:product_id(normalized_pn, brand)')
+      .select('*, counterpart:counterpart_id(name), product:product_id(normalized_pn, brand, images)')
       .eq('company_id', cid)
       .order('created_at', { ascending: false })
     setTxs((data || []).map((t: any) => ({
@@ -115,445 +167,437 @@ export default function TransactionsPage() {
       counterpart_name: t.counterpart?.name || '—',
       pn: t.product?.normalized_pn || '—',
       brand: t.product?.brand || '—',
+      product_image: t.product?.images?.[0] || null,
       escrow_status: t.escrow_status || 'none',
       currency: t.currency || 'EUR',
       escrow_currency: t.escrow_currency || 'EUR',
-      buyer_confirmed: t.buyer_confirmed || false,
-      seller_confirmed: t.seller_confirmed || false,
+      dealer_code: t.counterpart_id ? dealerCode(t.counterpart_id) : null,
     })))
     setLoading(false)
   }
 
   async function updateTx(txId: string, updates: any) {
-    await supabase.from('transactions').update(updates).eq('id', txId)
-    // Mirror to linked tx for status/escrow changes
+    await supabase.from('transactions').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', txId)
     const tx = txs.find(t => t.id === txId)
-    if (tx?.linked_transaction_id && (updates.status || updates.escrow_status || updates.shipping_ref)) {
-      await supabase.from('transactions').update(updates).eq('id', tx.linked_transaction_id)
+    if (tx?.linked_transaction_id) {
+      const mirror: any = { updated_at: new Date().toISOString() }
+      if (updates.status)          mirror.status = updates.status
+      if (updates.tracking_number) mirror.tracking_number = updates.tracking_number
+      if (updates.shipping_ref)    mirror.shipping_ref = updates.shipping_ref
+      if (updates.dispute_reason)  mirror.dispute_reason = updates.dispute_reason
+      if (updates.escrow_status)   mirror.escrow_status = updates.escrow_status
+      await supabase.from('transactions').update(mirror).eq('id', tx.linked_transaction_id)
     }
-    if (myId) await fetchTxs(myId)
+    if (myId) fetchTxs(myId)
   }
 
-  // Final Confirmation — both buyer and seller must confirm + optional doc
-  async function submitFinalConfirmation() {
-    if (!finalTx || !myId) return
-    setFinalSubmitting(true)
-    const isBuyer = finalTx.type === 'buy'
-    const updates: any = isBuyer
-      ? { buyer_confirmed: true }
-      : { seller_confirmed: true }
-    if (finalDocUrl) updates.shipping_ref = finalDocUrl  // reuse field or add doc_url
-
-    await supabase.from('transactions').update(updates).eq('id', finalTx.id)
-    if (finalTx.linked_transaction_id) await supabase.from('transactions').update(updates).eq('id', finalTx.linked_transaction_id)
-
-    // Check if both sides confirmed now
-    const { data: linked } = finalTx.linked_transaction_id
-      ? await supabase.from('transactions').select('buyer_confirmed, seller_confirmed').eq('id', finalTx.linked_transaction_id).single()
-      : { data: null }
-
-    const buyerDone  = isBuyer  ? true : (linked?.buyer_confirmed  || false)
-    const sellerDone = !isBuyer ? true : (linked?.seller_confirmed || false)
-
-    if (buyerDone && sellerDone) {
-      // Both confirmed → complete + release escrow
-      const finalUpdates = { status: 'completed', final_confirmed_at: new Date().toISOString(), escrow_status: finalTx.escrow_status === 'held' ? 'released' : finalTx.escrow_status, escrow_released_at: new Date().toISOString() }
-      await supabase.from('transactions').update(finalUpdates).eq('id', finalTx.id)
-      if (finalTx.linked_transaction_id) await supabase.from('transactions').update(finalUpdates).eq('id', finalTx.linked_transaction_id)
-    }
-
-    setFinalTx(null); setFinalDocUrl(''); setFinalNote('')
-    setFinalSubmitting(false)
-    if (myId) await fetchTxs(myId)
+  async function logEvent(txId: string, from: string, to: string, actor: string, notes?: string) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      await supabase.from('tx_events').insert({
+        tx_id: txId, from_status: from, to_status: to,
+        actor, actor_id: session?.user?.id ?? null,
+        notes: notes ?? null,
+      })
+    } catch (_) { /* non-critical */ }
   }
 
-  // Escrow request — checks balance, calls DB function
-  async function submitEscrowRequest() {
-    if (!escrowTx || !myId) return
-    const amt = parseFloat(escrowAmount) || (escrowTx.price && escrowTx.quantity ? escrowTx.price * escrowTx.quantity : 0)
-    if (amt <= 0) return
+  // ── Counter offer ────────────────────────────────────────────────────────
+  async function submitCounter() {
+    if (!counterTx) return
+    const price = parseFloat(counterPrice) || counterTx.price || 0
+    const qty   = parseInt(counterQty) || counterTx.quantity || 1
+    const note  = `Counter offer: ${qty} × ${price} ${counterTx.currency}${counterNotes ? ' — ' + counterNotes : ''}`
+    await updateTx(counterTx.id, { price, quantity: qty, notes: note, status: 'offer_sent' })
+    await logEvent(counterTx.id, counterTx.status, 'offer_sent', counterTx.type === 'buy' ? 'buyer' : 'seller', note)
+    setCounterTx(null)
+  }
 
-    // Call the DB function that checks balance + moves funds to admin
-    const { data: result, error } = await supabase.rpc('escrow_trade_hold', {
-      p_tx_id: escrowTx.id,
-      p_buyer_company_id: myId,
-      p_amount: amt,
-      p_currency: escrowTx.currency || 'EUR',
+  // ── Payment ──────────────────────────────────────────────────────────────
+  async function submitPayment() {
+    if (!payTx || !myId) return
+    setPayBusy(true)
+    const amt = parseFloat(payAmount)
+    if (!amt) { setPayBusy(false); return }
+
+    if (useEscrow) {
+      const { data: result, error } = await supabase.rpc('escrow_trade_hold', {
+        p_tx_id: payTx.id, p_buyer_company_id: myId, p_amount: amt, p_currency: payTx.currency,
+      })
+      if (error || !result?.ok) {
+        alert(result?.error || error?.message || 'Escrow failed')
+        setPayBusy(false); return
+      }
+      await updateTx(payTx.id, { status: 'payment_held', escrow_status: 'held', escrow_amount: amt, escrow_currency: payTx.currency, escrow_held_at: new Date().toISOString() })
+    } else {
+      await updateTx(payTx.id, { status: 'payment_held', escrow_status: 'none', shipping_ref: payRef || null })
+    }
+    await logEvent(payTx.id, 'confirmed', 'payment_held', 'buyer', `Payment: ${amt} ${payTx.currency} ${useEscrow ? '(escrow)' : '(direct) ref:' + payRef}`)
+    // Email seller: payment secured
+    sendEmail('tx_payment_held', {
+      company_id: payTx.counterpart_id,
+      pn: payTx.pn,
+      amount: amt,
+      currency: payTx.currency,
     })
+    setPayTx(null); setPayAmount(''); setPayRef(''); setPayBusy(false)
+  }
 
-    if (error || !result?.ok) {
-      alert(result?.error || error?.message || 'Escrow request failed — check your balance')
-      return
-    }
-
-    // Update TX status on both sides
-    await updateTx(escrowTx.id, { 
-      escrow_status: 'requested', 
-      escrow_amount: amt, 
-      escrow_currency: escrowTx.currency || 'EUR', 
-      escrow_ref: escrowRef || null 
+  // ── Tracking ─────────────────────────────────────────────────────────────
+  async function submitTracking() {
+    if (!trackTx || !trackNum) return
+    await updateTx(trackTx.id, { status: 'shipped', tracking_number: trackNum, shipping_ref: trackNum })
+    await logEvent(trackTx.id, 'ready_to_ship', 'shipped', 'seller', `Tracking: ${trackNum}`)
+    // Email buyer: shipped
+    sendEmail('tx_shipped', {
+      company_id: trackTx.counterpart_id,
+      pn: trackTx.pn,
+      quantity: trackTx.quantity,
+      tracking: trackNum,
     })
-    setEscrowTx(null); setEscrowAmount(''); setEscrowRef('')
+    setTrackTx(null); setTrackNum('')
   }
 
-  // Counter offer — buyer proposes new price/qty
-  async function submitCounterOffer() {
-    if (!counterTx || !myId) return
-    setCounterSubmitting(true)
-    const newPrice = parseFloat(counterPrice) || counterTx.price
-    const newQty = parseInt(counterQty) || counterTx.quantity
-    const note = `Counter offer: ${newQty} units @ ${newPrice} ${counterTx.currency}/unit${counterNotes ? '. ' + counterNotes : ''}`
-    
-    // Update buyer's TX with new proposed values + reset status to offer_sent
-    await supabase.from('transactions').update({
-      price: newPrice,
-      quantity: newQty,
-      notes: note,
-      status: 'offer_sent',
-      updated_at: new Date().toISOString(),
-    }).eq('id', counterTx.id)
-
-    // Mirror to seller's linked TX
-    if (counterTx.linked_transaction_id) {
-      await supabase.from('transactions').update({
-        price: newPrice,
-        quantity: newQty,
-        notes: note,
-        status: 'offer_sent',
-        updated_at: new Date().toISOString(),
-      }).eq('id', counterTx.linked_transaction_id)
+  // ── Dispute ───────────────────────────────────────────────────────────────
+  async function submitDispute() {
+    if (!dispTx || !dispReason) return
+    setDispBusy(true)
+    await updateTx(dispTx.id, { status: 'disputed', dispute_reason: dispReason, dispute_opened_at: new Date().toISOString() })
+    await logEvent(dispTx.id, dispTx.status, 'disputed', dispTx.type === 'buy' ? 'buyer' : 'seller', dispReason)
+    // Email admin: dispute
+    sendEmail('tx_disputed', {
+      tx_id: dispTx.id,
+      pn: dispTx.pn,
+      amount: dispTx.escrow_amount,
+      currency: dispTx.escrow_currency || dispTx.currency,
+      dealer_code: dispTx.dealer_code || '',
+      role: dispTx.type === 'buy' ? 'buyer' : 'seller',
+      reason: dispReason,
+    })
+    if (dispFile) {
+      const { data: { session } } = await supabase.auth.getSession()
+      await supabase.from('dispute_evidence').insert({ tx_id: dispTx.id, uploaded_by: session?.user.id, role: dispTx.type, file_url: dispFile, description: dispReason })
     }
-
-    setCounterTx(null); setCounterPrice(''); setCounterQty(''); setCounterNotes('')
-    setCounterSubmitting(false)
-    if (myId) await fetchTxs(myId)
+    setDispTx(null); setDispReason(''); setDispFile(''); setDispBusy(false)
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // ACTION BUTTONS
+  // ─────────────────────────────────────────────────────────────────────────
   function ActionButtons({ tx }: { tx: Tx }) {
-    const isSeller = tx.type === 'sell'
     const isBuyer  = tx.type === 'buy'
+    const isSeller = tx.type === 'sell'
     const s = tx.status
 
-    const btn = (label: string, color: string, bg: string, onClick: () => void, border?: string) => (
-      <button key={label} onClick={onClick} style={{ padding: '5px 11px', background: bg, color, border: border || `1px solid ${color}30`, borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' as const }}>
+    const btn = (label: string, color: string, bg: string, onClick: () => void, disabled = false) => (
+      <button key={label} onClick={onClick} disabled={disabled} style={{ padding: '6px 12px', background: disabled ? '#f1f5f9' : bg, color: disabled ? '#94a3b8' : color, border: `1px solid ${disabled ? '#e2e8f0' : color + '40'}`, borderRadius: 6, cursor: disabled ? 'not-allowed' : 'pointer', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>
         {label}
       </button>
     )
+
     const actions: any[] = []
 
-    // Offer stage
     if (s === 'offer_sent') {
-      if (isSeller) actions.push(btn('✓ Confirm Deal', '#15803d', '#f0fdf4', () => updateTx(tx.id, { status: 'confirmed' })))
-      if (isBuyer)  actions.push(btn('✎ Counter Offer', '#1d4ed8', '#eff6ff', () => { setCounterTx(tx); setCounterPrice(tx.price ? String(tx.price) : ''); setCounterQty(tx.quantity ? String(tx.quantity) : '') }))
+      if (isSeller) actions.push(btn('✓ Accept', '#15803d', '#f0fdf4', async () => {
+        await updateTx(tx.id, { status: 'confirmed' })
+        sendEmail('tx_confirmed', { company_id: tx.counterpart_id, pn: tx.pn, quantity: tx.quantity, price: tx.price, currency: tx.currency, dealer_code: tx.dealer_code })
+      }))
+      actions.push(btn('↩ Counter', '#1d4ed8', '#eff6ff', () => { setCounterTx(tx); setCounterPrice(String(tx.price || '')); setCounterQty(String(tx.quantity || '')) }))
       actions.push(btn('✕ Cancel', '#dc2626', '#fef2f2', () => updateTx(tx.id, { status: 'cancelled' })))
     }
 
-    // Confirmed stage
-    if (s === 'confirmed') {
-      if (isBuyer && tx.escrow_status === 'none') actions.push(btn('🔒 Request Escrow', '#6d28d9', '#f5f3ff', async () => { 
-        setEscrowTx(tx); setEscrowAmount(tx.price && tx.quantity ? String(tx.price * tx.quantity) : '')
-        // Fetch current balance
-        const { data: bals } = await supabase.from('escrow_balances').select('balance').eq('company_id', myId).eq('currency', tx.currency || 'EUR').maybeSingle()
-        setEscrowBalance(bals?.balance ?? 0)
+    if (s === 'confirmed' && isBuyer) {
+      const total = tx.price && tx.quantity ? tx.price * tx.quantity : 0
+      actions.push(btn(`💳 Pay ${total ? total.toLocaleString() + ' ' + tx.currency : ''}`, '#6d28d9', '#f5f3ff', async () => {
+        const { data: b } = await supabase.from('escrow_balances').select('balance').eq('company_id', myId).eq('currency', tx.currency).maybeSingle()
+        setEscrowBal(b?.balance ?? 0)
+        setPayTx(tx); setPayAmount(total ? String(total) : '')
       }))
-      if (isSeller && tx.escrow_status !== 'requested') actions.push(btn('📦 Mark Shipped', '#0e7490', '#ecfeff', () => updateTx(tx.id, { status: 'dispatched' })))
-      if (isSeller && tx.escrow_status === 'requested') actions.push(btn('⏳ Awaiting Escrow', '#6d28d9', '#f5f3ff', () => {}))
-      if (isBuyer && tx.escrow_status === 'requested')  actions.push(btn('💳 Escrow Funded', '#6d28d9', '#f5f3ff', () => updateTx(tx.id, { status: 'payment_held', escrow_status: 'held', escrow_held_at: new Date().toISOString() })))
     }
 
-    if (s === 'payment_held' && isSeller) actions.push(btn('📦 Mark Shipped', '#0e7490', '#ecfeff', () => updateTx(tx.id, { status: 'dispatched' })))
-    if (s === 'dispatched' && isBuyer)    actions.push(btn('✓ Confirm Received', '#15803d', '#f0fdf4', () => updateTx(tx.id, { status: 'delivered' })))
+    if (s === 'payment_held') {
+      actions.push(<div key="wait" style={{ fontSize: 11, color: '#94a3b8', padding: '4px 0' }}>⏳ Awaiting admin approval</div>)
+    }
 
-    // Delivered — Final Confirmation
+    if (s === 'ready_to_ship' && isSeller) {
+      actions.push(btn('🚚 Ship & Track', '#0891b2', '#ecfeff', () => { setTrackTx(tx); setTrackNum('') }))
+    }
+
+    if (s === 'shipped' && isBuyer) {
+      actions.push(btn('✓ Confirm Received', '#15803d', '#f0fdf4', async () => {
+        await updateTx(tx.id, { status: 'delivered' })
+        sendEmail('tx_delivered', { company_id: tx.counterpart_id, pn: tx.pn, amount: tx.escrow_amount, currency: tx.escrow_currency || tx.currency })
+      }))
+    }
+
     if (s === 'delivered') {
-      const myConfirmed = isBuyer ? tx.buyer_confirmed : tx.seller_confirmed
-      if (!myConfirmed) {
-        actions.push(btn('🏁 Final Confirmation', '#0f172a', '#f8fafc', () => setFinalTx(tx)))
-      } else {
-        actions.push(
-          <div key="waiting" style={{ fontSize: 11, color: '#94a3b8', padding: '5px 0' }}>
-            ⏳ Waiting for {isBuyer ? 'seller' : 'buyer'} confirmation
-          </div>
-        )
-      }
+      actions.push(<div key="wait" style={{ fontSize: 11, color: '#94a3b8', padding: '4px 0' }}>⏳ Awaiting admin escrow release</div>)
     }
 
-    if (!['completed','cancelled','disputed'].includes(s))
-      actions.push(btn('⚠ Dispute', '#dc2626', 'white', () => updateTx(tx.id, { status: 'disputed' }), '1px solid #fecaca'))
+    if (!['completed', 'cancelled', 'disputed', 'resolved_buyer', 'resolved_seller', 'resolved_split', 'offer_sent'].includes(s)) {
+      actions.push(btn('⚠ Dispute', '#dc2626', 'white', () => setDispTx(tx)))
+    }
 
     if (!actions.length) return null
-    return <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 4, flexShrink: 0 }}>{actions}</div>
+    return <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0, minWidth: 150 }}>{actions}</div>
   }
 
-  const needMyAction = txs.filter(t => t.status === 'offer_sent' && t.type === 'sell')
-  const waitingThem  = txs.filter(t => t.status === 'offer_sent' && t.type === 'buy')
-  const deliveredNeedConfirm = txs.filter(t => t.status === 'delivered' && !(t.type === 'buy' ? t.buyer_confirmed : t.seller_confirmed))
-  const active = txs.filter(t => !['offer_sent','completed','cancelled'].includes(t.status))
-  const done   = txs.filter(t => ['completed','cancelled','disputed'].includes(t.status))
-  const pendingAll = [...needMyAction, ...deliveredNeedConfirm, ...waitingThem]
-
-  const sections = [
-    { key: 'pending', label: `Needs Attention (${pendingAll.length})`, color: '#f59e0b' },
-    { key: 'active',  label: `In Progress (${active.length})`,        color: '#1d4ed8' },
-    { key: 'done',    label: `Closed (${done.length})`,                color: '#94a3b8' },
-  ]
-
+  // ─────────────────────────────────────────────────────────────────────────
+  // TX CARD
+  // ─────────────────────────────────────────────────────────────────────────
   function TxCard({ tx, highlight }: { tx: Tx; highlight?: string }) {
-    const meta = STATUS_META[tx.status]
-    const isExp = expanded === tx.id
-    const total = tx.price && tx.quantity ? tx.price * tx.quantity : null
+    const meta    = STATUS_META[tx.status] || { label: tx.status, color: '#64748b', bg: '#f8fafc' }
+    const isExp   = expanded === tx.id
+    const isBuyer = tx.type === 'buy'
+    const total   = tx.price && tx.quantity ? tx.price * tx.quantity : null
+    const nextMsg = NEXT_ACTION[tx.status]?.[isBuyer ? 'buyer' : 'seller']
+    const isMyAction = nextMsg?.startsWith('⚡')
 
     return (
-      <div style={{ background: 'white', border: `1px solid ${highlight || '#e2e8f0'}`, borderLeft: `3px solid ${highlight || '#e2e8f0'}`, borderRadius: 8, overflow: 'hidden', marginBottom: 8 }}>
+      <div style={{ background: 'white', border: `1px solid ${highlight || '#e2e8f0'}`, borderLeft: `3px solid ${isMyAction ? '#f59e0b' : highlight || meta.color}`, borderRadius: 8, overflow: 'hidden', marginBottom: 8 }}>
         <div style={{ padding: '12px 16px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
           <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => setExpanded(isExp ? null : tx.id)}>
+            {/* Badges */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
               {tx.tx_number && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, background: '#f8fafc', color: '#64748b', fontWeight: 700, fontFamily: 'monospace' }}>{tx.tx_number}</span>}
-              <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 4, fontWeight: 700, background: tx.type === 'buy' ? '#eff6ff' : '#f0fdf4', color: tx.type === 'buy' ? '#1e40af' : '#15803d' }}>{tx.type === 'buy' ? '🛒 BUY' : '📦 SELL'}</span>
+              <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 4, fontWeight: 700, background: isBuyer ? '#eff6ff' : '#f0fdf4', color: isBuyer ? '#1e40af' : '#15803d' }}>
+                {isBuyer ? '🛒 BUY' : '📦 SELL'}
+              </span>
               <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 4, background: meta.bg, color: meta.color, fontWeight: 600 }}>{meta.label}</span>
-              {tx.escrow_status !== 'none' && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, background: '#f5f3ff', color: '#6d28d9', fontWeight: 600 }}>🔒 {tx.escrow_status}</span>}
-              {tx.status === 'delivered' && (tx.buyer_confirmed || tx.seller_confirmed) && (
-                <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, background: '#f0fdf4', color: '#15803d', fontWeight: 600 }}>
-                  {tx.buyer_confirmed && tx.seller_confirmed ? '🏁 Both Confirmed' : tx.type === 'buy' ? (tx.buyer_confirmed ? '✓ You confirmed' : '⏳ Waiting you') : (tx.seller_confirmed ? '✓ You confirmed' : '⏳ Waiting you')}
-                </span>
-              )}
+              {tx.escrow_status === 'held' && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, background: '#f5f3ff', color: '#6d28d9', fontWeight: 600 }}>🔒 escrow held</span>}
             </div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>{tx.brand !== '—' ? `${tx.brand} ` : ''}{tx.pn}</div>
+
+            {/* Product */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 2 }}>
+              {tx.product_image ? (
+                <img src={tx.product_image} alt=""
+                  style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 5, border: '1px solid #e2e8f0', flexShrink: 0 }} />
+              ) : (
+                <div style={{ width: 36, height: 36, borderRadius: 5, border: '1px solid #e2e8f0', background: '#f8fafc', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>📦</div>
+              )}
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>
+                {tx.brand !== '—' ? `${tx.brand} ` : ''}{tx.pn}
+              </div>
+            </div>
+
+            {/* Summary */}
             <div style={{ fontSize: 12, color: '#64748b' }}>
-              {tx.type === 'buy' ? 'From' : 'To'}: <strong style={{ color: '#475569' }}>{tx.counterpart_name}</strong>
+              {isBuyer ? 'From' : 'To'}: <strong style={{ color: '#475569' }}>{tx.counterpart_name}</strong>
               {tx.quantity && <> · {tx.quantity} units</>}
               {tx.price && <> · {tx.price} {tx.currency}/unit</>}
-              {total && <> · <strong style={{ color: '#0f172a' }}>Total {total.toLocaleString()} {tx.currency}</strong></>}
+              {total && <> · <strong style={{ color: '#0f172a' }}>Total: {total.toLocaleString()} {tx.currency}</strong></>}
               {tx.incoterm && <> · {tx.incoterm}</>}
               <span style={{ marginLeft: 8, color: '#cbd5e1' }}>{timeAgo(tx.created_at)}</span>
             </div>
-            <Pipeline status={tx.status} />
+
+            <PipelineBar status={tx.status} />
+
+            {/* Next action hint */}
+            {nextMsg && (
+              <div style={{ marginTop: 6, padding: '5px 10px', background: isMyAction ? '#fffbeb' : '#f8fafc', border: `1px solid ${isMyAction ? '#fde68a' : '#f1f5f9'}`, borderRadius: 5, fontSize: 11, color: isMyAction ? '#92400e' : '#64748b' }}>
+                {nextMsg}
+              </div>
+            )}
           </div>
+
           <ActionButtons tx={tx} />
         </div>
 
+        {/* Expanded */}
         {isExp && (
           <div style={{ borderTop: '1px solid #f8fafc', padding: '12px 16px', background: '#fafafa', fontSize: 13 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
-              {tx.payment_terms && <div><div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 1, textTransform: 'uppercase' as const, fontWeight: 600 }}>Payment Terms</div><div>{tx.payment_terms}</div></div>}
-              {tx.incoterm && <div><div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 1, textTransform: 'uppercase' as const, fontWeight: 600 }}>Incoterm</div><div style={{ fontWeight: 700 }}>{tx.incoterm}</div></div>}
-              {tx.shipping_ref && <div><div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 1, textTransform: 'uppercase' as const, fontWeight: 600 }}>Tracking / Doc</div><div style={{ fontFamily: 'monospace', fontSize: 12 }}>{tx.shipping_ref}</div></div>}
-              {tx.notes && <div style={{ gridColumn: '1 / -1' }}><div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 1, textTransform: 'uppercase' as const, fontWeight: 600 }}>Notes</div><div>{tx.notes}</div></div>}
-              {tx.final_confirmed_at && <div style={{ gridColumn: '1 / -1' }}><div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 1, textTransform: 'uppercase' as const, fontWeight: 600 }}>Final Confirmed</div><div style={{ color: '#15803d', fontWeight: 600 }}>{new Date(tx.final_confirmed_at).toLocaleString()}</div></div>}
-              {tx.escrow_status !== 'none' && (
+              {tx.payment_terms && <div><div style={lbl}>Payment Terms</div><div>{tx.payment_terms}</div></div>}
+              {tx.incoterm && <div><div style={lbl}>Incoterm</div><div style={{ fontWeight: 700 }}>{tx.incoterm}</div></div>}
+              {tx.tracking_number && <div><div style={lbl}>Tracking</div><div style={{ fontFamily: 'monospace', fontSize: 12 }}>{tx.tracking_number}</div></div>}
+              {tx.dispute_reason && <div style={{ gridColumn: '1 / -1' }}><div style={lbl}>Dispute Reason</div><div style={{ color: '#dc2626' }}>{tx.dispute_reason}</div></div>}
+              {tx.notes && <div style={{ gridColumn: '1 / -1' }}><div style={lbl}>Notes</div><div>{tx.notes}</div></div>}
+              {tx.escrow_status === 'held' && (
                 <div style={{ gridColumn: '1 / -1', padding: '10px 12px', background: '#f5f3ff', borderRadius: 8, border: '1px solid #ddd6fe' }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#6d28d9', marginBottom: 4 }}>🔒 Escrow</div>
                   <div style={{ fontSize: 12, color: '#7c3aed', display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-                    <span>Status: <strong>{tx.escrow_status}</strong></span>
-                    {tx.escrow_amount && <span>Amount: <strong>{tx.escrow_amount} {tx.escrow_currency}</strong></span>}
-                    {tx.escrow_ref && <span>Ref: <strong style={{ fontFamily: 'monospace' }}>{tx.escrow_ref}</strong></span>}
+                    <span>Amount: <strong>{tx.escrow_amount} {tx.escrow_currency}</strong></span>
                     {tx.escrow_held_at && <span>Held: {new Date(tx.escrow_held_at).toLocaleDateString()}</span>}
                     {tx.escrow_released_at && <span style={{ color: '#15803d' }}>Released: {new Date(tx.escrow_released_at).toLocaleDateString()}</span>}
                   </div>
                 </div>
               )}
             </div>
-            {/* Shipping ref input */}
-            {tx.status === 'dispatched' && tx.type === 'sell' && !tx.shipping_ref && (
-              <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
-                <input id={`ship-${tx.id}`} placeholder="Tracking / AWB number..." style={{ flex: 1, padding: '7px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, outline: 'none' }} />
-                <button onClick={async () => {
-                  const ref = (document.getElementById(`ship-${tx.id}`) as HTMLInputElement)?.value
-                  if (!ref) return
-                  await updateTx(tx.id, { shipping_ref: ref })
-                }} style={{ padding: '7px 14px', background: '#0e7490', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
-                  Save Tracking
-                </button>
-              </div>
-            )}
           </div>
         )}
       </div>
     )
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // SECTIONS
+  // ─────────────────────────────────────────────────────────────────────────
+  const ACTIVE = ['offer_sent', 'confirmed', 'payment_held', 'ready_to_ship', 'shipped', 'delivered']
+  const DONE   = ['completed', 'cancelled', 'disputed', 'resolved_buyer', 'resolved_seller', 'resolved_split']
+
+  const myActionTxs = txs.filter(t => {
+    const s = t.status; const isBuyer = t.type === 'buy'; const isSeller = t.type === 'sell'
+    return (
+      (s === 'offer_sent'    && isSeller) ||
+      (s === 'confirmed'     && isBuyer)  ||
+      (s === 'ready_to_ship' && isSeller) ||
+      (s === 'shipped'       && isBuyer)
+    )
+  })
+  const waitingTxs = txs.filter(t => ACTIVE.includes(t.status) && !myActionTxs.find(x => x.id === t.id))
+  const activeTxs  = txs.filter(t => ACTIVE.includes(t.status))
+  const doneTxs    = txs.filter(t => DONE.includes(t.status))
+
+  const tabs = [
+    { key: 'pending', label: `Needs Action (${myActionTxs.length})`, color: '#f59e0b' },
+    { key: 'active',  label: `In Progress (${activeTxs.length})`,    color: '#1d4ed8' },
+    { key: 'done',    label: `Closed (${doneTxs.length})`,            color: '#94a3b8' },
+  ]
+
+  const empty = (msg: string) => (
+    <div style={{ padding: '40px 20px', textAlign: 'center', color: '#94a3b8', background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, fontSize: 13 }}>{msg}</div>
+  )
+
   return (
     <div>
       <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: '0 0 20px', letterSpacing: '-0.03em' }}>Transactions</h1>
 
+      {/* Tabs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
-        {sections.map(s => (
-          <button key={s.key} onClick={() => setActiveSection(s.key as any)}
-            style={{ padding: '7px 16px', border: `1px solid ${activeSection === s.key ? s.color : '#e2e8f0'}`, borderRadius: 20, cursor: 'pointer', fontSize: 13, fontWeight: activeSection === s.key ? 700 : 400, background: activeSection === s.key ? s.color : 'white', color: activeSection === s.key ? 'white' : '#64748b', transition: 'all 0.15s' }}>
-            {s.label}
+        {tabs.map(t => (
+          <button key={t.key} onClick={() => setSection(t.key as any)}
+            style={{ padding: '7px 16px', border: `1px solid ${section === t.key ? t.color : '#e2e8f0'}`, borderRadius: 20, cursor: 'pointer', fontSize: 13, fontWeight: section === t.key ? 700 : 400, background: section === t.key ? t.color : 'white', color: section === t.key ? 'white' : '#64748b' }}>
+            {t.label}
           </button>
         ))}
       </div>
 
       {loading ? <div style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>Loading...</div> : (
         <>
-          {activeSection === 'pending' && (
+          {section === 'pending' && (
             <div>
-              {needMyAction.length > 0 && (
+              {myActionTxs.length > 0 && (
                 <div style={{ marginBottom: 20 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#92400e', textTransform: 'uppercase' as const, letterSpacing: '0.07em', marginBottom: 10 }}>
-                    🟡 Awaiting My Action — Confirm or Decline
-                  </div>
-                  {needMyAction.map(tx => <TxCard key={tx.id} tx={tx} highlight="#f59e0b" />)}
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>⚡ Action Required</div>
+                  {myActionTxs.map(tx => <TxCard key={tx.id} tx={tx} highlight="#f59e0b" />)}
                 </div>
               )}
-              {deliveredNeedConfirm.length > 0 && (
-                <div style={{ marginBottom: 20 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#0f766e', textTransform: 'uppercase' as const, letterSpacing: '0.07em', marginBottom: 10 }}>
-                    🏁 Final Confirmation Required
-                  </div>
-                  {deliveredNeedConfirm.map(tx => <TxCard key={tx.id} tx={tx} highlight="#0d9488" />)}
-                </div>
-              )}
-              {waitingThem.length > 0 && (
+              {waitingTxs.length > 0 && (
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' as const, letterSpacing: '0.07em', marginBottom: 10 }}>
-                    ⏳ Waiting for Counterpart
-                  </div>
-                  {waitingThem.map(tx => <TxCard key={tx.id} tx={tx} highlight="#bfdbfe" />)}
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>⏳ Waiting for Counterpart / Admin</div>
+                  {waitingTxs.map(tx => <TxCard key={tx.id} tx={tx} />)}
                 </div>
               )}
-              {pendingAll.length === 0 && (
-                <div style={{ padding: '40px 20px', textAlign: 'center', color: '#94a3b8', background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, fontSize: 13 }}>No pending actions</div>
-              )}
+              {myActionTxs.length === 0 && waitingTxs.length === 0 && empty('No pending actions 🎉')}
             </div>
           )}
-          {activeSection === 'active' && (
-            <div>
-              {active.length === 0
-                ? <div style={{ padding: '40px 20px', textAlign: 'center', color: '#94a3b8', background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, fontSize: 13 }}>No active transactions</div>
-                : active.map(tx => <TxCard key={tx.id} tx={tx} />)}
-            </div>
-          )}
-          {activeSection === 'done' && (
-            <div>
-              {done.length === 0
-                ? <div style={{ padding: '40px 20px', textAlign: 'center', color: '#94a3b8', background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, fontSize: 13 }}>No closed transactions yet</div>
-                : done.map(tx => <TxCard key={tx.id} tx={tx} />)}
-            </div>
-          )}
+          {section === 'active'  && (activeTxs.length  === 0 ? empty('No active transactions')   : activeTxs.map(tx => <TxCard key={tx.id} tx={tx} />))}
+          {section === 'done'    && (doneTxs.length     === 0 ? empty('No closed transactions yet') : doneTxs.map(tx => <TxCard key={tx.id} tx={tx} />))}
         </>
       )}
 
-      {/* ── FINAL CONFIRMATION MODAL ── */}
-      {finalTx && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ background: 'white', borderRadius: 12, padding: 24, maxWidth: 420, width: '100%' }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>🏁 Final Confirmation</div>
-            <div style={{ fontSize: 13, color: '#64748b', marginBottom: 16, lineHeight: 1.6 }}>
-              Both buyer and seller must confirm payment received and goods delivered. When both confirm, the transaction closes and escrow (if any) is released automatically.
+      {/* ── COUNTER OFFER MODAL ──────────────────────────────────────── */}
+      {counterTx && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: 'white', borderRadius: 12, padding: 24, maxWidth: 400, width: '100%' }}>
+            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>↩ Counter Offer</div>
+            <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 8, marginBottom: 14, fontSize: 13 }}>
+              <div style={{ fontWeight: 700 }}>{counterTx.brand} {counterTx.pn}</div>
+              <div style={{ color: '#64748b', marginTop: 2 }}>Current: {counterTx.quantity} × {counterTx.price} {counterTx.currency}/unit</div>
             </div>
-            <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 8, marginBottom: 16, fontSize: 13 }}>
-              <div style={{ fontWeight: 700 }}>{finalTx.brand} {finalTx.pn}</div>
-              <div style={{ color: '#64748b', marginTop: 2 }}>{finalTx.quantity} units · {finalTx.price} {finalTx.currency}/unit</div>
-              {finalTx.escrow_status === 'held' && <div style={{ color: '#6d28d9', marginTop: 4, fontWeight: 600 }}>🔒 Escrow {finalTx.escrow_amount} {finalTx.escrow_currency} will be released</div>}
+            <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
+              <div style={{ flex: 1 }}><label style={lbl}>Qty</label><input type="number" value={counterQty} onChange={e => setCounterQty(e.target.value)} style={inp()} placeholder={String(counterTx.quantity || '')} /></div>
+              <div style={{ flex: 1 }}><label style={lbl}>Price ({counterTx.currency}/unit)</label><input type="number" value={counterPrice} onChange={e => setCounterPrice(e.target.value)} style={inp()} placeholder={String(counterTx.price || '')} /></div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div>
-                <label style={{ fontSize: 11, color: '#64748b', display: 'block', marginBottom: 3, fontWeight: 600, textTransform: 'uppercase' as const }}>Payment / Delivery Document URL (optional)</label>
-                <input value={finalDocUrl} onChange={e => setFinalDocUrl(e.target.value)} placeholder="Bank receipt, waybill, or doc link..." style={{ width: '100%', padding: '8px 11px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, outline: 'none', boxSizing: 'border-box' as const }} />
+            {counterPrice && counterQty && (
+              <div style={{ padding: '7px 12px', background: '#eff6ff', borderRadius: 6, fontSize: 12, color: '#1d4ed8', fontWeight: 600, marginBottom: 10 }}>
+                New total: {(parseFloat(counterPrice) * parseInt(counterQty)).toLocaleString()} {counterTx.currency}
               </div>
-              <div>
-                <label style={{ fontSize: 11, color: '#64748b', display: 'block', marginBottom: 3, fontWeight: 600, textTransform: 'uppercase' as const }}>Notes (optional)</label>
-                <input value={finalNote} onChange={e => setFinalNote(e.target.value)} placeholder="Any final notes..." style={{ width: '100%', padding: '8px 11px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, outline: 'none', boxSizing: 'border-box' as const }} />
-              </div>
-              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                <button onClick={submitFinalConfirmation} disabled={finalSubmitting} style={{ flex: 1, padding: '11px', background: finalSubmitting ? '#94a3b8' : '#0f172a', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
-                  {finalSubmitting ? 'Confirming...' : '✓ Confirm My Side'}
-                </button>
-                <button onClick={() => setFinalTx(null)} style={{ padding: '11px 16px', background: 'white', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>Cancel</button>
-              </div>
+            )}
+            <div style={{ marginBottom: 12 }}><label style={lbl}>Notes</label><input value={counterNotes} onChange={e => setCounterNotes(e.target.value)} style={inp()} placeholder="Reason..." /></div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={submitCounter} style={{ flex: 1, padding: '10px', background: '#1d4ed8', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>Send Counter</button>
+              <button onClick={() => setCounterTx(null)} style={{ padding: '10px 16px', background: 'white', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>Cancel</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── ESCROW REQUEST MODAL ── */}
-      {escrowTx && (() => {
-        const amt = parseFloat(escrowAmount) || 0
-        const insufficient = amt > escrowBalance
-        const cur = escrowTx.currency || 'EUR'
+      {/* ── PAYMENT MODAL ────────────────────────────────────────────── */}
+      {payTx && (() => {
+        const amt = parseFloat(payAmount) || 0
+        const insufficient = useEscrow && amt > escrowBal
         return (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ background: 'white', borderRadius: 12, padding: 24, maxWidth: 400, width: '100%' }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', marginBottom: 8 }}>🔒 Request Escrow</div>
-            <div style={{ fontSize: 13, color: '#64748b', marginBottom: 14, lineHeight: 1.6 }}>
-              This amount will be deducted from your escrow balance and held by admin until the deal completes. Seller will be notified of the prepayment.
-            </div>
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+            <div style={{ background: 'white', borderRadius: 12, padding: 24, maxWidth: 420, width: '100%' }}>
+              <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>💳 Payment</div>
+              <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14 }}>{payTx.brand} {payTx.pn} · {payTx.quantity} units · {payTx.counterpart_name}</div>
 
-            {/* Balance indicator */}
-            <div style={{ padding: '10px 14px', background: insufficient ? '#fef2f2' : '#f0fdf4', border: `1px solid ${insufficient ? '#fecaca' : '#bbf7d0'}`, borderRadius: 8, marginBottom: 14, fontSize: 13 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>Your {cur} balance:</span>
-                <span style={{ fontWeight: 700, color: insufficient ? '#dc2626' : '#15803d' }}>{escrowBalance.toFixed(2)} {cur}</span>
-              </div>
-              {insufficient && <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>⚠ Insufficient balance. Please deposit funds first.</div>}
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 10 }}>
-              <div>
-                <label style={{ fontSize: 11, color: '#64748b', display: 'block', marginBottom: 3, fontWeight: 600, textTransform: 'uppercase' as const }}>Escrow Amount ({cur})</label>
-                <input type="number" value={escrowAmount} onChange={e => setEscrowAmount(e.target.value)} placeholder="Amount to hold..." style={{ width: '100%', padding: '8px 11px', border: `1px solid ${insufficient ? '#fecaca' : '#e2e8f0'}`, borderRadius: 6, fontSize: 13, outline: 'none', boxSizing: 'border-box' as const }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 11, color: '#64748b', display: 'block', marginBottom: 3, fontWeight: 600, textTransform: 'uppercase' as const }}>Reference (optional)</label>
-                <input value={escrowRef} onChange={e => setEscrowRef(e.target.value)} placeholder="SWIFT, bank ref..." style={{ width: '100%', padding: '8px 11px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, outline: 'none', boxSizing: 'border-box' as const }} />
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={submitEscrowRequest} disabled={insufficient || amt <= 0} style={{ flex: 1, padding: '10px', background: insufficient || amt <= 0 ? '#94a3b8' : '#6d28d9', color: 'white', border: 'none', borderRadius: 6, cursor: insufficient || amt <= 0 ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700 }}>
-                  {insufficient ? 'Insufficient Balance' : 'Request Escrow'}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                <button onClick={() => setUseEscrow(true)} style={{ flex: 1, padding: '8px', background: useEscrow ? '#f5f3ff' : 'white', color: useEscrow ? '#6d28d9' : '#64748b', border: `1px solid ${useEscrow ? '#6d28d9' : '#e2e8f0'}`, borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: useEscrow ? 700 : 400 }}>
+                  🔒 Escrow ({escrowBal.toFixed(0)} {payTx.currency} available)
                 </button>
-                <button onClick={() => setEscrowTx(null)} style={{ padding: '10px 16px', background: 'white', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>Cancel</button>
+                <button onClick={() => setUseEscrow(false)} style={{ flex: 1, padding: '8px', background: !useEscrow ? '#fffbeb' : 'white', color: !useEscrow ? '#92400e' : '#64748b', border: `1px solid ${!useEscrow ? '#f59e0b' : '#e2e8f0'}`, borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: !useEscrow ? 700 : 400 }}>
+                  🏦 Direct Transfer
+                </button>
+              </div>
+
+              {useEscrow && insufficient && (
+                <div style={{ padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, fontSize: 12, color: '#dc2626', marginBottom: 12 }}>
+                  ⚠ Insufficient escrow balance — deposit funds first
+                </div>
+              )}
+              {!useEscrow && (
+                <div style={{ padding: '8px 12px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 6, fontSize: 12, color: '#92400e', marginBottom: 12 }}>
+                  ⚠ Direct payment proof must be shared with admin before order proceeds
+                </div>
+              )}
+
+              <div style={{ marginBottom: 10 }}><label style={lbl}>Amount ({payTx.currency})</label><input type="number" value={payAmount} onChange={e => setPayAmount(e.target.value)} style={inp({ borderColor: insufficient ? '#fecaca' : '#e2e8f0' })} placeholder="0.00" /></div>
+              {!useEscrow && <div style={{ marginBottom: 12 }}><label style={lbl}>Bank Ref / Transfer ID</label><input value={payRef} onChange={e => setPayRef(e.target.value)} style={inp()} placeholder="SWIFT ref..." /></div>}
+
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={submitPayment} disabled={payBusy || insufficient || !amt}
+                  style={{ flex: 1, padding: '10px', background: (payBusy || insufficient || !amt) ? '#94a3b8' : '#6d28d9', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+                  {payBusy ? 'Processing...' : 'Confirm Payment'}
+                </button>
+                <button onClick={() => setPayTx(null)} style={{ padding: '10px 16px', background: 'white', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>Cancel</button>
               </div>
             </div>
           </div>
-        </div>
         )
       })()}
 
-      {/* ── COUNTER OFFER MODAL ── */}
-      {counterTx && (
+      {/* ── TRACKING MODAL ───────────────────────────────────────────── */}
+      {trackTx && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: 'white', borderRadius: 12, padding: 24, maxWidth: 380, width: '100%' }}>
+            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>🚚 Enter Tracking</div>
+            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 16 }}>{trackTx.brand} {trackTx.pn} → {trackTx.counterpart_name}</div>
+            <div style={{ marginBottom: 14 }}><label style={lbl}>Tracking / AWB Number *</label><input value={trackNum} onChange={e => setTrackNum(e.target.value)} style={inp()} placeholder="e.g. 1Z999AA10123456784" /></div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={submitTracking} disabled={!trackNum} style={{ flex: 1, padding: '10px', background: !trackNum ? '#94a3b8' : '#0891b2', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>Confirm Shipment</button>
+              <button onClick={() => setTrackTx(null)} style={{ padding: '10px 16px', background: 'white', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── DISPUTE MODAL ────────────────────────────────────────────── */}
+      {dispTx && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           <div style={{ background: 'white', borderRadius: 12, padding: 24, maxWidth: 420, width: '100%' }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', marginBottom: 8 }}>✎ Counter Offer</div>
-            <div style={{ fontSize: 13, color: '#64748b', marginBottom: 14, lineHeight: 1.6 }}>
-              Propose new terms. The seller will see your updated offer and can confirm or counter back.
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#dc2626', marginBottom: 6 }}>⚠ Open Dispute</div>
+            <div style={{ padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, fontSize: 12, color: '#dc2626', marginBottom: 14 }}>
+              ❄ Escrow will be frozen. Platform admin will review and decide within 48h.
             </div>
-            <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 8, marginBottom: 14, fontSize: 13 }}>
-              <div style={{ fontWeight: 700 }}>{counterTx.brand} {counterTx.pn}</div>
-              <div style={{ color: '#64748b', marginTop: 2 }}>Current: {counterTx.quantity} units @ {counterTx.price} {counterTx.currency}/unit</div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 10 }}>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: 11, color: '#64748b', display: 'block', marginBottom: 3, fontWeight: 600, textTransform: 'uppercase' as const }}>New Quantity</label>
-                  <input type="number" value={counterQty} onChange={e => setCounterQty(e.target.value)} placeholder={String(counterTx.quantity || '')} style={{ width: '100%', padding: '8px 11px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, outline: 'none', boxSizing: 'border-box' as const }} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: 11, color: '#64748b', display: 'block', marginBottom: 3, fontWeight: 600, textTransform: 'uppercase' as const }}>New Price ({counterTx.currency}/unit)</label>
-                  <input type="number" value={counterPrice} onChange={e => setCounterPrice(e.target.value)} placeholder={String(counterTx.price || '')} style={{ width: '100%', padding: '8px 11px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, outline: 'none', boxSizing: 'border-box' as const }} />
-                </div>
-              </div>
-              {counterPrice && counterQty && (
-                <div style={{ padding: '8px 12px', background: '#eff6ff', borderRadius: 6, fontSize: 12, color: '#1d4ed8', fontWeight: 600 }}>
-                  New total: {(parseFloat(counterPrice) * parseInt(counterQty)).toLocaleString()} {counterTx.currency}
-                  {counterTx.price && counterTx.quantity && (
-                    <span style={{ color: '#94a3b8', fontWeight: 400, marginLeft: 8 }}>
-                      (was {(counterTx.price * counterTx.quantity).toLocaleString()} {counterTx.currency})
-                    </span>
-                  )}
-                </div>
-              )}
-              <div>
-                <label style={{ fontSize: 11, color: '#64748b', display: 'block', marginBottom: 3, fontWeight: 600, textTransform: 'uppercase' as const }}>Notes (optional)</label>
-                <input value={counterNotes} onChange={e => setCounterNotes(e.target.value)} placeholder="Reason for counter offer..." style={{ width: '100%', padding: '8px 11px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, outline: 'none', boxSizing: 'border-box' as const }} />
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={submitCounterOffer} disabled={counterSubmitting} style={{ flex: 1, padding: '10px', background: counterSubmitting ? '#94a3b8' : '#1d4ed8', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
-                  {counterSubmitting ? 'Sending...' : 'Send Counter Offer'}
-                </button>
-                <button onClick={() => setCounterTx(null)} style={{ padding: '10px 16px', background: 'white', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>Cancel</button>
-              </div>
+            <div style={{ marginBottom: 10 }}><label style={lbl}>Reason *</label><textarea value={dispReason} onChange={e => setDispReason(e.target.value)} style={{ ...inp(), height: 80, resize: 'vertical' }} placeholder="Describe the issue..." /></div>
+            <div style={{ marginBottom: 14 }}><label style={lbl}>Evidence URL (optional)</label><input value={dispFile} onChange={e => setDispFile(e.target.value)} style={inp()} placeholder="https://..." /></div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={submitDispute} disabled={dispBusy || !dispReason} style={{ flex: 1, padding: '10px', background: !dispReason ? '#94a3b8' : '#dc2626', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+                {dispBusy ? 'Opening...' : 'Open Dispute'}
+              </button>
+              <button onClick={() => setDispTx(null)} style={{ padding: '10px 16px', background: 'white', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>Cancel</button>
             </div>
           </div>
         </div>

@@ -42,7 +42,18 @@ function timeAgo(d: string) {
 // ─── Status badge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status, accent, accentLight }: { status: string; accent: string; accentLight: string }) {
   const colors: Record<string, [string, string]> = {
-    offer_sent:   ['#2563eb', '#eff6ff'],
+    offer_sent:               ['#2563eb', '#eff6ff'],
+    offer_accepted:           ['#15803d', '#f0fdf4'],
+    order_confirmed:          ['#15803d', '#f0fdf4'],
+    prepayment_deposited:     ['#7c3aed', '#f5f3ff'],
+    prepayment_confirmed:     ['#7c3aed', '#f5f3ff'],
+    ready_to_ship:            ['#0891b2', '#ecfeff'],
+    preshipment_deposited:    ['#7c3aed', '#f5f3ff'],
+    preshipment_paid:         ['#7c3aed', '#f5f3ff'],
+    shipment_authorized:      ['#0891b2', '#ecfeff'],
+    shipped:                  ['#0891b2', '#ecfeff'],
+    final_payment_deposited:  ['#7c3aed', '#f5f3ff'],
+    final_payment_paid:       ['#7c3aed', '#f5f3ff'],
     confirmed:    ['#059669', '#ecfdf5'],
     payment_held: ['#7c3aed', '#f5f3ff'],
     dispatched:   ['#0891b2', '#ecfeff'],
@@ -92,10 +103,10 @@ function Row({ children, onClick, selected }: { children: React.ReactNode; onCli
   )
 }
 function TD({ children, mono }: { children: React.ReactNode; mono?: boolean }) {
-  return <td style={{ padding: '10px 14px', fontSize: 12, color: '#0f172a', fontFamily: mono ? 'monospace' : undefined, whiteSpace: 'nowrap' as const }}>{children}</td>
+  return <td style={{ padding: '7px 10px', fontSize: 11, color: '#0f172a', fontFamily: mono ? 'monospace' : undefined, whiteSpace: 'nowrap' as const }}>{children}</td>
 }
 function TH({ children }: { children: React.ReactNode }) {
-  return <th style={{ padding: '8px 14px', fontSize: 11, fontWeight: 700, color: '#64748b', textAlign: 'left' as const, textTransform: 'uppercase' as const, letterSpacing: '0.06em', whiteSpace: 'nowrap' as const, background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>{children}</th>
+  return <th style={{ padding: '6px 10px', fontSize: 10, fontWeight: 700, color: '#64748b', textAlign: 'left' as const, textTransform: 'uppercase' as const, letterSpacing: '0.04em', whiteSpace: 'nowrap' as const, background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>{children}</th>
 }
 
 // ─── Detail drawer ────────────────────────────────────────────────────────────
@@ -129,15 +140,19 @@ function TransactionsMonitor({ cfg }: { cfg: PageConfig }) {
   const [selected, setSelected] = useState<any | null>(null)
   const [events, setEvents] = useState<FeedEvent[]>([])
   const [loading, setLoading] = useState(true)
+  const [adminEscrow, setAdminEscrow] = useState<{currency: string; balance: number}[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase
-      .from('transactions')
-      .select('*, company:company_id(name), counterpart:counterpart_id(name), product:product_id(normalized_pn, brand)')
-      .order('created_at', { ascending: false })
-      .limit(300)
-    const rows = (data || []).map((t: any) => ({
+    const [txRes, adminEscrowRes] = await Promise.all([
+      supabase.from('transactions')
+        .select('*, company:company_id(name), counterpart:counterpart_id(name), product:product_id(normalized_pn, brand)')
+        .order('created_at', { ascending: false })
+        .limit(300),
+      supabase.from('admin_escrow_balance').select('*'),
+    ])
+    setAdminEscrow(adminEscrowRes.data || [])
+    const rows = (txRes.data || []).map((t: any) => ({
       ...t,
       company_name: t.company?.name || '—',
       counterpart_name: t.counterpart?.name || '—',
@@ -161,9 +176,91 @@ function TransactionsMonitor({ cfg }: { cfg: PageConfig }) {
     return () => { supabase.removeChannel(ch) }
   }, [load])
 
-  const statuses = ['all', 'offer_sent', 'confirmed', 'payment_held', 'dispatched', 'delivered', 'completed', 'cancelled', 'disputed']
+  async function adminAdvanceTx(tx: any, newStatus: string) {
+    const updates: any = { status: newStatus, updated_at: new Date().toISOString() }
+
+    // Release escrow to seller when completing
+    // Always derive seller/buyer from the BUY side tx
+    const buyerCompanyId = tx.type === 'buy' ? tx.company_id : tx.counterpart_id
+    const sellerCompanyId = tx.type === 'sell' ? tx.company_id : tx.counterpart_id
+
+    // Get escrow_amount — buy side has it, sell side may be null
+    // Fall back to actual admin_escrow_account balance for this tx
+    let escrowAmt = tx.escrow_amount
+    let escrowCur = tx.escrow_currency || 'EUR'
+    if (!escrowAmt) {
+      const { data: adminHeld } = await supabase
+        .from('admin_escrow_account')
+        .select('amount')
+        .eq('tx_id', tx.linked_transaction_id || tx.id)
+        .eq('type', 'trade_hold')
+      escrowAmt = adminHeld ? adminHeld.reduce((s: number, r: any) => s + r.amount, 0) : 0
+    }
+
+    if (newStatus === 'completed' && escrowAmt && escrowCur) {
+      const sellerId = sellerCompanyId
+      const { data: result } = await supabase.rpc('escrow_trade_release', {
+        p_tx_id: tx.id,
+        p_seller_company_id: sellerId,
+        p_amount: tx.escrow_amount,
+        p_currency: tx.escrow_currency,
+      })
+      if (!result?.ok) {
+        alert('Escrow release failed: ' + (result?.error || 'unknown error'))
+        return
+      }
+      updates.escrow_status = 'released'
+      updates.escrow_released_at = new Date().toISOString()
+    }
+
+    // Refund escrow to buyer when resolving in buyer's favor
+    if ((newStatus === 'resolved_buyer' || newStatus === 'cancelled') && escrowAmt && tx.escrow_status === 'held') {
+      const buyerId = buyerCompanyId
+      const { data: result } = await supabase.rpc('escrow_trade_refund', {
+        p_tx_id: tx.id,
+        p_buyer_company_id: buyerId,
+        p_amount: escrowAmt,
+        p_currency: escrowCur,
+      })
+      if (!result?.ok) {
+        alert('Escrow refund failed: ' + (result?.error || 'unknown error'))
+        return
+      }
+      updates.escrow_status = 'refunded'
+    }
+
+    // Seller gets escrow when resolved in seller's favor
+    if (newStatus === 'resolved_seller' && escrowAmt && tx.escrow_status === 'held') {
+      const sellerId = sellerCompanyId
+      const { data: result } = await supabase.rpc('escrow_trade_release', {
+        p_tx_id: tx.id,
+        p_seller_company_id: sellerId,
+        p_amount: escrowAmt,
+        p_currency: escrowCur,
+      })
+      if (!result?.ok) {
+        alert('Escrow release failed: ' + (result?.error || 'unknown error'))
+        return
+      }
+      updates.escrow_status = 'released'
+      updates.escrow_released_at = new Date().toISOString()
+    }
+
+    await supabase.from('transactions').update(updates).eq('id', tx.id)
+    if (tx.linked_transaction_id) {
+      await supabase.from('transactions').update(updates).eq('id', tx.linked_transaction_id)
+    }
+    await supabase.from('tx_events').insert({
+      tx_id: tx.id, from_status: tx.status, to_status: newStatus, actor: 'admin',
+    })
+    load()
+  }
+
+  const ADMIN_ACTION_STATUSES = ['payment_held', 'delivered', 'disputed']
+  const statuses = ['all', 'needs_action', 'offer_sent', 'confirmed', 'payment_held', 'ready_to_ship', 'shipped', 'delivered', 'completed', 'cancelled', 'disputed', 'resolved_buyer', 'resolved_seller', 'resolved_split']
   const filtered = rows.filter(r => {
-    if (filter !== 'all' && r.status !== filter) return false
+    if (filter === 'needs_action' && !ADMIN_ACTION_STATUSES.includes(r.status)) return false
+    if (filter !== 'all' && filter !== 'needs_action' && r.status !== filter) return false
     if (search && !`${r.tx_number} ${r.company_name} ${r.counterpart_name} ${r.pn}`.toLowerCase().includes(search.toLowerCase())) return false
     return true
   })
@@ -172,6 +269,17 @@ function TransactionsMonitor({ cfg }: { cfg: PageConfig }) {
     <div style={{ display: 'flex', gap: 16, height: 'calc(100vh - 140px)' }}>
       {/* Main */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, gap: 12, minWidth: 0 }}>
+        {/* Admin escrow balance cards */}
+        {adminEscrow.length > 0 && (
+          <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+            <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, display: 'flex', alignItems: 'center' }}>🔒 Admin Escrow Held:</div>
+            {adminEscrow.map(b => (
+              <div key={b.currency} style={{ padding: '4px 12px', background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 6, fontSize: 12, fontWeight: 700, color: '#6d28d9' }}>
+                {b.currency === 'EUR' ? '€' : b.currency === 'USD' ? '$' : b.currency === 'GBP' ? '£' : ''}{Number(b.balance).toLocaleString()} {b.currency}
+              </div>
+            ))}
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' as const }}>
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search TX#, company, PN..." style={{ padding: '7px 12px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, outline: 'none', width: 240 }} />
           <FilterBar options={statuses} active={filter} onChange={setFilter} accent={cfg.accent} />
@@ -179,8 +287,8 @@ function TransactionsMonitor({ cfg }: { cfg: PageConfig }) {
         </div>
         <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'auto', flex: 1 }}>
           {loading ? <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Loading...</div> : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead><tr><TH>TX #</TH><TH>Type</TH><TH>Status</TH><TH>Company</TH><TH>Counterpart</TH><TH>PN</TH><TH>Qty</TH><TH>Price</TH><TH>Escrow</TH><TH>Date</TH></tr></thead>
+            <table style={{ width: 'max-content', minWidth: '100%', borderCollapse: 'collapse' }}>
+              <thead><tr><TH>TX #</TH><TH>Type</TH><TH>Status</TH><TH>Company</TH><TH>Counterpart</TH><TH>PN</TH><TH>Qty</TH><TH>Price</TH><TH>Escrow</TH><TH>Date</TH><TH>Admin Action</TH></tr></thead>
               <tbody>
                 {filtered.map(t => (
                   <Row key={t.id} onClick={() => setSelected(t)} selected={selected?.id === t.id}>
@@ -194,6 +302,22 @@ function TransactionsMonitor({ cfg }: { cfg: PageConfig }) {
                     <TD>{t.price ? `${t.price} ${t.currency}` : '—'}</TD>
                     <TD>{t.escrow_status !== 'none' && t.escrow_status ? <StatusBadge status={t.escrow_status} accent={cfg.accent} accentLight={cfg.accentLight} /> : <span style={{ color: '#e2e8f0' }}>—</span>}</TD>
                     <TD>{new Date(t.created_at).toLocaleDateString()}</TD>
+                    <TD>
+                      <div style={{ display: 'flex', gap: 3 }} onClick={e => e.stopPropagation()}>
+                        {t.status === 'payment_held' && (
+                          <button onClick={() => adminAdvanceTx(t, 'ready_to_ship')} style={{ padding: '3px 8px', background: '#ecfeff', color: '#0891b2', border: '1px solid #a5f3fc', borderRadius: 4, cursor: 'pointer', fontSize: 10, fontWeight: 600 }}>✓ Approve & Ship</button>
+                        )}
+                        {t.status === 'delivered' && (
+                          <button onClick={() => adminAdvanceTx(t, 'completed')} style={{ padding: '3px 8px', background: '#f0fdf4', color: '#059669', border: '1px solid #6ee7b7', borderRadius: 4, cursor: 'pointer', fontSize: 10, fontWeight: 600 }}>✓ Release Escrow</button>
+                        )}
+                        {t.status === 'disputed' && (
+                          <>
+                            <button onClick={() => adminAdvanceTx(t, 'resolved_buyer')} style={{ padding: '3px 8px', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: 4, cursor: 'pointer', fontSize: 10, fontWeight: 600 }}>→ Buyer</button>
+                            <button onClick={() => adminAdvanceTx(t, 'resolved_seller')} style={{ padding: '3px 8px', background: '#f0fdf4', color: '#059669', border: '1px solid #6ee7b7', borderRadius: 4, cursor: 'pointer', fontSize: 10, fontWeight: 600 }}>→ Seller</button>
+                          </>
+                        )}
+                      </div>
+                    </TD>
                   </Row>
                 ))}
               </tbody>
@@ -309,7 +433,6 @@ function MessagesMonitor({ cfg }: { cfg: PageConfig }) {
 function EscrowMonitor({ cfg }: { cfg: PageConfig }) {
   const [rows, setRows] = useState<any[]>([])
   const [ledger, setLedger] = useState<any[]>([])
-  const [adminBalances, setAdminBalances] = useState<any[]>([])
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<any | null>(null)
@@ -318,16 +441,14 @@ function EscrowMonitor({ cfg }: { cfg: PageConfig }) {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [txRes, ledgerRes, adminRes] = await Promise.all([
+    const [txRes, ledgerRes] = await Promise.all([
       supabase.from('transactions').select('*, company:company_id(name), counterpart:counterpart_id(name), product:product_id(normalized_pn)').neq('escrow_status', 'none').not('escrow_status', 'is', null).order('created_at', { ascending: false }),
       supabase.from('escrow_ledger').select('*, company:company_id(name)').order('created_at', { ascending: false }).limit(100),
-      supabase.from('admin_escrow_balance').select('*'),
     ])
     const seen = new Set<string>()
     const deduped = (txRes.data || []).filter((t: any) => { const k = t.linked_transaction_id || t.id; if (seen.has(k)) return false; seen.add(k); return true })
     setRows(deduped)
     setLedger(ledgerRes.data || [])
-    setAdminBalances(adminRes.data || [])
     setEvents(deduped.slice(0, 30).map((t: any) => ({
       id: t.id, time: t.created_at,
       label: `Escrow ${t.escrow_status?.toUpperCase()}`,
@@ -347,46 +468,13 @@ function EscrowMonitor({ cfg }: { cfg: PageConfig }) {
   })
 
   async function takeAction(tx: any, action: string) {
-    const cur = tx.escrow_currency || 'EUR'
-    const amt = tx.escrow_amount || 0
-
-    if (action === 'released' && amt > 0) {
-      // Release to seller via RPC
-      const sellerId = tx.type === 'sell' ? tx.company_id : tx.counterpart_id
-      await supabase.rpc('escrow_trade_release', { p_tx_id: tx.id, p_seller_company_id: sellerId, p_amount: amt, p_currency: cur })
-    } else if (action === 'refunded' && amt > 0) {
-      // Refund to buyer via RPC
-      const buyerId = tx.type === 'buy' ? tx.company_id : tx.counterpart_id
-      await supabase.rpc('escrow_trade_refund', { p_tx_id: tx.id, p_buyer_company_id: buyerId, p_amount: amt, p_currency: cur })
-    }
-
-    // Update TX status
-    const updates: any = { escrow_status: action }
-    if (action === 'held') updates.escrow_held_at = new Date().toISOString()
-    if (action === 'released') updates.escrow_released_at = new Date().toISOString()
-    await supabase.from('transactions').update(updates).eq('id', tx.id)
-    if (tx.linked_transaction_id) await supabase.from('transactions').update(updates).eq('id', tx.linked_transaction_id)
+    await supabase.rpc('set_escrow', { tx_id: tx.id, new_escrow_status: action, ref: null, held_at: action === 'held' ? new Date().toISOString() : null, released_at: action === 'released' ? new Date().toISOString() : null })
     load()
   }
 
   return (
     <div style={{ display: 'flex', gap: 16, height: 'calc(100vh - 140px)' }}>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, gap: 12, minWidth: 0 }}>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' as const }}>
-          {/* Admin Escrow Balance Cards */}
-          {adminBalances.map((b: any) => (
-            <div key={b.currency} style={{ padding: '6px 14px', background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 8 }}>
-              <div style={{ fontSize: 10, color: '#7c3aed', fontWeight: 700, textTransform: 'uppercase' as const }}>Admin {b.currency}</div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: '#6d28d9' }}>{Number(b.balance).toFixed(2)}</div>
-            </div>
-          ))}
-          {adminBalances.length === 0 && (
-            <div style={{ padding: '6px 14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8 }}>
-              <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700 }}>ADMIN ESCROW</div>
-              <div style={{ fontSize: 14, color: '#94a3b8' }}>0.00</div>
-            </div>
-          )}
-        </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' as const }}>
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search TX#, company..." style={{ padding: '7px 12px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, outline: 'none', width: 240 }} />
           <FilterBar options={['all', 'requested', 'held', 'released', 'refunded']} active={filter} onChange={setFilter} accent={cfg.accent} />

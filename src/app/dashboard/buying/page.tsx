@@ -91,8 +91,7 @@ export default function BuyingListPage() {
     }
     const { data: myTx } = await supabase.from('transactions').insert(base).select().single()
     if (myTx) {
-      const { data: theirTx } = await supabase.from('transactions').insert({ ...base, company_id: item.seller_id, counterpart_id: myId, type: 'sell', linked_transaction_id: myTx.id }).select().single()
-      if (theirTx) await supabase.from('transactions').update({ linked_transaction_id: theirTx.id }).eq('id', myTx.id)
+      // Mirror TX created by DB trigger (create_mirror_transaction)
       // Remove from cart
       await supabase.from('cart_items').delete().eq('id', item.id)
     }
