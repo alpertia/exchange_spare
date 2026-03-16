@@ -148,8 +148,8 @@ export function AdminMessagesPage() {
   )
 }
 
-// ── ADMIN ESCROW MONITOR ──────────────────────────────────────────────────────
-export function AdminEscrowPage() {
+// ── ADMIN TRADE ASSURANCE MONITOR ──────────────────────────────────────────────────────
+export function AdminTradeAssurancePage() {
   const [escrows, setEscrows] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [actionTx, setActionTx] = useState<any | null>(null)

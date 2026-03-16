@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type AdminPage = 'transactions' | 'messages' | 'escrow' | 'deposits'
+type AdminPage = 'transactions' | 'messages' | 'trade-assurance' | 'deposits'
 
 interface PageConfig {
   title: string
@@ -17,7 +17,7 @@ interface PageConfig {
 const PAGE_CONFIG: Record<AdminPage, PageConfig> = {
   transactions: { title: 'Monitor Transactions', accent: '#2563eb', accentLight: '#eff6ff', accentBorder: '#bfdbfe', icon: '🔄' },
   messages:     { title: 'Monitor Messages',     accent: '#7c3aed', accentLight: '#f5f3ff', accentBorder: '#ddd6fe', icon: '💬' },
-  escrow:       { title: 'Monitor Escrow',       accent: '#0891b2', accentLight: '#ecfeff', accentBorder: '#a5f3fc', icon: '🔒' },
+  'trade-assurance': { title: 'Monitor Trade Assurance',       accent: '#0891b2', accentLight: '#ecfeff', accentBorder: '#a5f3fc', icon: '🔒' },
   deposits:     { title: 'Deposit Applications', accent: '#059669', accentLight: '#ecfdf5', accentBorder: '#6ee7b7', icon: '📄' },
 }
 
@@ -179,7 +179,7 @@ function TransactionsMonitor({ cfg }: { cfg: PageConfig }) {
   async function adminAdvanceTx(tx: any, newStatus: string) {
     const updates: any = { status: newStatus, updated_at: new Date().toISOString() }
 
-    // Release escrow to seller when completing
+    // Release Trade Assurance to seller when completing
     // Always derive seller/buyer from the BUY side tx
     const buyerCompanyId = tx.type === 'buy' ? tx.company_id : tx.counterpart_id
     const sellerCompanyId = tx.type === 'sell' ? tx.company_id : tx.counterpart_id
@@ -206,14 +206,14 @@ function TransactionsMonitor({ cfg }: { cfg: PageConfig }) {
         p_currency: tx.escrow_currency,
       })
       if (!result?.ok) {
-        alert('Escrow release failed: ' + (result?.error || 'unknown error'))
+        alert('Trade Assurance release failed: ' + (result?.error || 'unknown error'))
         return
       }
       updates.escrow_status = 'released'
       updates.escrow_released_at = new Date().toISOString()
     }
 
-    // Refund escrow to buyer when resolving in buyer's favor
+    // Refund Trade Assurance to buyer when resolving in buyer's favor
     if ((newStatus === 'resolved_buyer' || newStatus === 'cancelled') && escrowAmt && tx.escrow_status === 'held') {
       const buyerId = buyerCompanyId
       const { data: result } = await supabase.rpc('escrow_trade_refund', {
@@ -223,13 +223,13 @@ function TransactionsMonitor({ cfg }: { cfg: PageConfig }) {
         p_currency: escrowCur,
       })
       if (!result?.ok) {
-        alert('Escrow refund failed: ' + (result?.error || 'unknown error'))
+        alert('Trade Assurance refund failed: ' + (result?.error || 'unknown error'))
         return
       }
       updates.escrow_status = 'refunded'
     }
 
-    // Seller gets escrow when resolved in seller's favor
+    // Seller gets Trade Assurance when resolved in seller's favor
     if (newStatus === 'resolved_seller' && escrowAmt && tx.escrow_status === 'held') {
       const sellerId = sellerCompanyId
       const { data: result } = await supabase.rpc('escrow_trade_release', {
@@ -239,7 +239,7 @@ function TransactionsMonitor({ cfg }: { cfg: PageConfig }) {
         p_currency: escrowCur,
       })
       if (!result?.ok) {
-        alert('Escrow release failed: ' + (result?.error || 'unknown error'))
+        alert('Trade Assurance release failed: ' + (result?.error || 'unknown error'))
         return
       }
       updates.escrow_status = 'released'
@@ -269,10 +269,10 @@ function TransactionsMonitor({ cfg }: { cfg: PageConfig }) {
     <div style={{ display: 'flex', gap: 16, height: 'calc(100vh - 140px)' }}>
       {/* Main */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, gap: 12, minWidth: 0 }}>
-        {/* Admin escrow balance cards */}
+        {/* Admin Trade Assurance balance cards */}
         {adminEscrow.length > 0 && (
           <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
-            <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, display: 'flex', alignItems: 'center' }}>🔒 Admin Escrow Held:</div>
+            <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, display: 'flex', alignItems: 'center' }}>🛡️ Admin Trade Assurance Held:</div>
             {adminEscrow.map(b => (
               <div key={b.currency} style={{ padding: '4px 12px', background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 6, fontSize: 12, fontWeight: 700, color: '#6d28d9' }}>
                 {b.currency === 'EUR' ? '€' : b.currency === 'USD' ? '$' : b.currency === 'GBP' ? '£' : ''}{Number(b.balance).toLocaleString()} {b.currency}
@@ -288,7 +288,7 @@ function TransactionsMonitor({ cfg }: { cfg: PageConfig }) {
         <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'auto', flex: 1 }}>
           {loading ? <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Loading...</div> : (
             <table style={{ width: 'max-content', minWidth: '100%', borderCollapse: 'collapse' }}>
-              <thead><tr><TH>TX #</TH><TH>Type</TH><TH>Status</TH><TH>Company</TH><TH>Counterpart</TH><TH>PN</TH><TH>Qty</TH><TH>Price</TH><TH>Escrow</TH><TH>Date</TH><TH>Admin Action</TH></tr></thead>
+              <thead><tr><TH>TX #</TH><TH>Type</TH><TH>Status</TH><TH>Company</TH><TH>Counterpart</TH><TH>PN</TH><TH>Qty</TH><TH>Price</TH><TH>Trade Assurance</TH><TH>Date</TH><TH>Admin Action</TH></tr></thead>
               <tbody>
                 {filtered.map(t => (
                   <Row key={t.id} onClick={() => setSelected(t)} selected={selected?.id === t.id}>
@@ -308,7 +308,7 @@ function TransactionsMonitor({ cfg }: { cfg: PageConfig }) {
                           <button onClick={() => adminAdvanceTx(t, 'ready_to_ship')} style={{ padding: '3px 8px', background: '#ecfeff', color: '#0891b2', border: '1px solid #a5f3fc', borderRadius: 4, cursor: 'pointer', fontSize: 10, fontWeight: 600 }}>✓ Approve & Ship</button>
                         )}
                         {t.status === 'delivered' && (
-                          <button onClick={() => adminAdvanceTx(t, 'completed')} style={{ padding: '3px 8px', background: '#f0fdf4', color: '#059669', border: '1px solid #6ee7b7', borderRadius: 4, cursor: 'pointer', fontSize: 10, fontWeight: 600 }}>✓ Release Escrow</button>
+                          <button onClick={() => adminAdvanceTx(t, 'completed')} style={{ padding: '3px 8px', background: '#f0fdf4', color: '#059669', border: '1px solid #6ee7b7', borderRadius: 4, cursor: 'pointer', fontSize: 10, fontWeight: 600 }}>✓ Release Trade Assurance</button>
                         )}
                         {t.status === 'disputed' && (
                           <>
@@ -428,9 +428,9 @@ function MessagesMonitor({ cfg }: { cfg: PageConfig }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// ESCROW PAGE
+// TRADE ASSURANCE PAGE
 // ══════════════════════════════════════════════════════════════════════════════
-function EscrowMonitor({ cfg }: { cfg: PageConfig }) {
+function TradeAssuranceMonitor({ cfg }: { cfg: PageConfig }) {
   const [rows, setRows] = useState<any[]>([])
   const [ledger, setLedger] = useState<any[]>([])
   const [filter, setFilter] = useState('all')
@@ -479,7 +479,7 @@ function EscrowMonitor({ cfg }: { cfg: PageConfig }) {
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search TX#, company..." style={{ padding: '7px 12px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 13, outline: 'none', width: 240 }} />
           <FilterBar options={['all', 'requested', 'held', 'released', 'refunded']} active={filter} onChange={setFilter} accent={cfg.accent} />
         </div>
-        {/* Escrow transactions */}
+        {/* Trade Assurance transactions */}
         <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'auto', flex: 1 }}>
           {loading ? <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Loading...</div> : (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -509,7 +509,7 @@ function EscrowMonitor({ cfg }: { cfg: PageConfig }) {
         </div>
         {/* Ledger */}
         <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'auto', maxHeight: 200 }}>
-          <div style={{ padding: '8px 14px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>Escrow Ledger</div>
+          <div style={{ padding: '8px 14px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>Trade Assurance Ledger</div>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead><tr><TH>Company</TH><TH>Type</TH><TH>Amount</TH><TH>Balance After</TH><TH>Description</TH><TH>Date</TH></tr></thead>
             <tbody>
@@ -528,7 +528,7 @@ function EscrowMonitor({ cfg }: { cfg: PageConfig }) {
         </div>
       </div>
       <EventFeed events={events} cfg={cfg} onSelect={e => setSelected(e.data)} selectedId={selected?.id} />
-      {selected && <DetailDrawer item={selected} page="escrow" onClose={() => setSelected(null)} accent={cfg.accent} accentLight={cfg.accentLight} />}
+      {selected && <DetailDrawer item={selected} page="trade-assurance" onClose={() => setSelected(null)} accent={cfg.accent} accentLight={cfg.accentLight} />}
     </div>
   )
 }
@@ -668,7 +668,7 @@ export default function AdminPage({ page }: { page: AdminPage }) {
 
       {page === 'transactions' && <TransactionsMonitor cfg={cfg} />}
       {page === 'messages'     && <MessagesMonitor cfg={cfg} />}
-      {page === 'escrow'       && <EscrowMonitor cfg={cfg} />}
+      {page === 'trade-assurance'       && <TradeAssuranceMonitor cfg={cfg} />}
       {page === 'deposits'     && <DepositsMonitor cfg={cfg} />}
     </div>
   )

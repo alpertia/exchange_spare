@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
       await adminClient.auth.admin.deleteUser(authData.user.id)
       return NextResponse.json({ error: rpcData[0].error }, { status: 400 })
     }
+    fetch(new URL('/api/email', req.url).toString(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'welcome', data: { to: email.trim().toLowerCase(), company_name: companyName.trim().toUpperCase() } }) }).catch(() => {})
     return NextResponse.json({ success: true, role: rpcData?.[0]?.role || 'user' })
   } catch (e: any) {
     return NextResponse.json({ error: e.message || 'Unknown error' }, { status: 500 })

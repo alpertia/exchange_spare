@@ -13,7 +13,7 @@ const navItems = [
   { label: "My Messages",             href: "/dashboard/messages" },
   { label: "My Transactions",         href: "/dashboard/transactions" },
   { label: "Product Knowledge Base",  href: "/dashboard/knowledge" },
-  { label: "My Balance",              href: "/dashboard/escrow" },
+  { label: "Trade Assurance",              href: "/dashboard/trade-assurance" },
   { label: "My Profile",              href: "/dashboard/profile" },
   { label: "Settings",                href: "/dashboard/settings" },
 ]
@@ -22,7 +22,7 @@ const adminNavItems = [
   { label: "🔔 Admin Inbox",     href: "/dashboard/admin/notifications" },
   { label: "🔄 Transactions",    href: "/dashboard/admin/transactions" },
   { label: "💬 Messages",        href: "/dashboard/admin/messages" },
-  { label: "🛡️ Trade Assurance", href: "/dashboard/admin/escrow" },
+  { label: "🛡️ Trade Assurance", href: "/dashboard/admin/trade-assurance" },
   { label: "📄 Deposits",        href: "/dashboard/admin/deposits" },
 ]
 
@@ -209,7 +209,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Trade Assurance Balance */}
         {escrowBalances.length > 0 && (
-          <Link href="/dashboard/escrow" style={{ display: "block", padding: "10px 16px", background: "#E4EDE4", borderBottom: "1px solid rgba(0,0,0,0.08)", textDecoration: "none" }}>
+          <Link href="/dashboard/trade-assurance" style={{ display: "block", padding: "10px 16px", background: "#E4EDE4", borderBottom: "1px solid rgba(0,0,0,0.08)", textDecoration: "none" }}>
             <div style={{ fontSize: 9, fontWeight: 700, color: "#5A5545", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 3 }}>🛡️ Trade Assurance</div>
             {escrowBalances.map(b => (
               <div key={b.currency} style={{ fontSize: 15, fontWeight: 700, color: "#0A0A0A", lineHeight: 1.3, fontFamily: "'DM Mono', monospace" }}>

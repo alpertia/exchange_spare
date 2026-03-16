@@ -21,7 +21,7 @@ const TYPE_META: Record<string, { icon: string; color: string; bg: string; label
   admin_mention:      { icon: '📣', color: '#f59e0b', bg: '#fffbeb', label: '@Admin Mention' },
   correction_request: { icon: '✏️', color: '#dc2626', bg: '#fef2f2', label: 'Correction Request' },
   dispute:            { icon: '⚠️', color: '#dc2626', bg: '#fef2f2', label: 'Dispute Opened' },
-  escrow_request:     { icon: '🔒', color: '#7c3aed', bg: '#f5f3ff', label: 'Escrow Request' },
+  escrow_request: { icon: '🛡️', color: '#7c3aed', bg: '#f5f3ff', label: 'Trade Assurance Request' },
   deposit_pending:    { icon: '📄', color: '#059669', bg: '#ecfdf5', label: 'Deposit Application' },
   tx_needs_action:    { icon: '🔄', color: '#2563eb', bg: '#eff6ff', label: 'TX Needs Action' },
   message_mention:    { icon: '💬', color: '#0891b2', bg: '#ecfeff', label: 'Message @Admin' },
@@ -96,7 +96,7 @@ export default function AdminNotificationsPage() {
     ;(escrowRes.data || []).forEach((t: any) => {
       liveNotifs.push({
         id: `esc-${t.id}`, type: 'escrow_request',
-        title: `Escrow requested: ${t.tx_number || t.id.slice(0,8)}`,
+        title: `Trade Assurance requested: ${t.tx_number || t.id.slice(0,8)}`,
         body: null,
         source_table: 'transactions', source_id: t.id,
         company_id: t.company_id, company_name: t.companies?.name || '—',
@@ -144,7 +144,7 @@ export default function AdminNotificationsPage() {
     if (id.startsWith('tx-') || id.startsWith('dep-') || id.startsWith('esc-')) {
       // Navigate to relevant page
       const notif = notifs.find(n => n.id === id)
-      if (notif?.source_table === 'transactions') router.push('/dashboard/admin/escrow')
+      if (notif?.source_table === 'transactions') router.push('/dashboard/admin/trade-assurance')
       if (notif?.source_table === 'deposit_applications') router.push('/dashboard/admin/deposits')
       return
     }
@@ -160,7 +160,7 @@ export default function AdminNotificationsPage() {
   function navigateTo(n: Notif) {
     markRead(n.id)
     if (n.source_table === 'product_comments' && n.source_id) router.push(`/dashboard/knowledge/${n.source_id}`)
-    else if (n.source_table === 'transactions') router.push('/dashboard/admin/escrow')
+    else if (n.source_table === 'transactions') router.push('/dashboard/admin/trade-assurance')
     else if (n.source_table === 'deposit_applications') router.push('/dashboard/admin/deposits')
     else if (n.source_table === 'messages') router.push('/dashboard/admin/messages')
   }
@@ -189,7 +189,7 @@ export default function AdminNotificationsPage() {
         {[
           { label: 'Corrections', count: counts.corrections, color: '#dc2626', bg: '#fef2f2', type: 'correction_request' },
           { label: 'Disputes',    count: counts.disputes,    color: '#dc2626', bg: '#fef2f2', type: 'dispute' },
-          { label: 'Escrow',      count: counts.escrow,      color: '#7c3aed', bg: '#f5f3ff', type: 'escrow_request' },
+          { label: 'Trade Assurance',      count: counts.escrow,      color: '#7c3aed', bg: '#f5f3ff', type: 'escrow_request' },
           { label: 'Deposits',    count: counts.deposits,    color: '#059669', bg: '#ecfdf5', type: 'deposit_pending' },
         ].map(c => (
           <div key={c.label} onClick={() => setTypeFilter(c.type)}

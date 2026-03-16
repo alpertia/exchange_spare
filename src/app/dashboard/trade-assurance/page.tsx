@@ -2,6 +2,16 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
+async function sendEmail(type: string, data: Record<string, any>) {
+  try {
+    await fetch('/api/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, data }),
+    })
+  } catch (_) { /* non-critical */ }
+}
+
 // escrow_balances view'dan geliyor: { company_id, currency, balance }
 type BalanceRow = { currency: string; balance: number }
 type LedgerRow = {
@@ -43,7 +53,7 @@ const lbl = {
   fontWeight: 600 as const, textTransform: 'uppercase' as const, letterSpacing: '0.05em'
 }
 
-export default function EscrowPage() {
+export default function TradeAssurancePage() {
   const [balances, setBalances] = useState<BalanceRow[]>([])
   const [ledger, setLedger] = useState<LedgerRow[]>([])
   const [deposits, setDeposits] = useState<DepositApp[]>([])
@@ -87,7 +97,7 @@ export default function EscrowPage() {
     const { data: co } = await supabase.from('companies').select('name, vat_number, address').eq('id', p.company_id).single()
     setCompanyProfile(co || null)
     await load(p.company_id)
-    supabase.channel('escrow-page')
+    supabase.channel('trade-assurance-page')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'escrow_ledger' }, () => load(p.company_id))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'deposit_applications' }, () => load(p.company_id))
       .subscribe()
@@ -115,6 +125,16 @@ export default function EscrowPage() {
       bank_ref: dBankRef || null, bank_name: dBankName || null,
       iban: dIban || null, swift: dSwift || null,
       notes: dNotes || null, status: 'pending',
+    })
+    // Email admin
+    sendEmail('deposit_request', {
+      company_id: myCompanyId,
+      company_name: companyProfile?.name || 'Unknown Company',
+      amount: parseFloat(dAmount),
+      currency: dCurrency,
+      bank_name: dBankName || null,
+      bank_ref: dBankRef || null,
+      notes: dNotes || null,
     })
     setSubmitting(false); setSubmitted(true)
     setDAmount(''); setDBankRef(''); setDBankName(''); setDIban(''); setDSwift(''); setDNotes('')
@@ -147,7 +167,7 @@ export default function EscrowPage() {
     <div>
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: '0 0 4px', letterSpacing: '-0.03em' }}>🛡️ Trade Assurance Account</h1>
-        <div style={{ fontSize: 13, color: '#94a3b8' }}>Secure global trading — protected by SpareShare Trade Assurance</div>
+        <div style={{ fontSize: 13, color: '#94a3b8' }}>Secure trading balance for transaction protection</div>
       </div>
 
       {/* Balance cards */}

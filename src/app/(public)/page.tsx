@@ -67,7 +67,7 @@ export default function MarketplaceLandingPage() {
           Buy and sell telecom parts<br /><em style={{ fontStyle: 'italic', color: '#185FA5' }}>with confidence.</em>
         </h1>
         <p className="a3" style={{ fontSize: 17, color: '#5A5545', lineHeight: 1.75, maxWidth: 520, margin: '0 auto 40px' }}>
-          97,000+ verified part numbers. Post inventory, find what you need, and close deals — protected by Trade Assurance escrow.
+          97,000+ verified part numbers. Post inventory, find what you need, and close deals — protected by Trade Assurance.
         </p>
         <div className="a3" style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
           {loggedIn ? (
@@ -124,7 +124,7 @@ export default function MarketplaceLandingPage() {
               { icon: '📋', t: 'List inventory', d: 'Post your surplus stock in minutes. AI fills in product details from the part number automatically.' },
               { icon: '🔍', t: 'Post buy intents', d: 'Tell the market what you need. Sellers with matching stock will reach out directly.' },
               { icon: '🤝', t: 'Make & receive offers', d: 'Negotiate price, quantity and incoterms directly on the platform — structured and tracked.' },
-              { icon: '🛡', t: 'Trade Assurance', d: 'Every transaction is escrow-protected. Funds held until delivery is confirmed.' },
+              { icon: '🛡', t: 'Trade Assurance', d: 'Every transaction is protected by Trade Assurance. Funds held until delivery is confirmed.' },
               { icon: '🤖', t: 'AI matching', d: 'Our AI automatically matches buy intents to available listings across 97,000+ verified PNs.' },
               { icon: '💬', t: 'Anonymous messaging', d: 'Communicate safely before revealing your identity. Contact info is only shared after deal confirmation.' },
             ].map((f, i) => (

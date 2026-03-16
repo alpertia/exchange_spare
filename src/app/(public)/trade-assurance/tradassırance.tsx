@@ -48,7 +48,7 @@ export default function TradeAssurancePage() {
           Your money moves only<br /><em style={{ fontStyle:'italic', color:'#3D7A5C' }}>when the deal is done.</em>
         </h1>
         <p className="a3" style={{ fontSize:17, color:'#5A5545', lineHeight:1.75, maxWidth:520, margin:'0 auto 40px' }}>
-          SpareShare holds buyer funds in escrow until delivery is confirmed. No wire transfer risk. No unresolved disputes. Every transaction is protected.
+          SpareShare holds buyer funds in Trade Assurance until delivery is confirmed. No wire transfer risk. No unresolved disputes. Every transaction is protected.
         </p>
         <div className="a3" style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap' }}>
           <Link href="/register" className="btn-main">Open a free account →</Link>
@@ -61,7 +61,7 @@ export default function TradeAssurancePage() {
           <span className="tag" style={{ background:'#1E1E1E', color:'#8A8070' }}>How it works</span>
           <h2 style={{ fontFamily:"'DM Serif Display', serif", fontSize:'clamp(28px, 4vw, 48px)', fontWeight:400, letterSpacing:'-0.03em', color:'#F7F6F2', marginTop:20, marginBottom:48, lineHeight:1.1 }}>Four steps. Zero risk.</h2>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:1, background:'#1E1E1E', borderRadius:16, overflow:'hidden' }}>
-            {[{n:'01',t:'Deposit funds',d:'Load your Trade Assurance account via bank transfer. Funds held securely.'},{n:'02',t:'Confirm deal',d:'Agree on price and terms with the seller. Both parties confirm.'},{n:'03',t:'Seller ships',d:'Funds locked in escrow. Seller ships with tracking. Buyer protected.'},{n:'04',t:'Release payment',d:'Buyer confirms delivery. Funds released instantly. Done.'}].map((s,i) => (
+            {[{n:'01',t:'Deposit funds',d:'Load your Trade Assurance account via bank transfer. Funds held securely.'},{n:'02',t:'Confirm deal',d:'Agree on price and terms with the seller. Both parties confirm.'},{n:'03',t:'Seller ships',d:'Funds locked in Trade Assurance. Seller ships with tracking. Buyer protected.'},{n:'04',t:'Release payment',d:'Buyer confirms delivery. Funds released instantly. Done.'}].map((s,i) => (
               <div key={i} className="hover-lift" style={{ padding:'32px 24px', background:'#0F0F0F' }}>
                 <div style={{ fontFamily:"'DM Serif Display', serif", fontSize:36, color:'#2A2A2A', marginBottom:20 }}>{s.n}</div>
                 <div style={{ fontSize:15, fontWeight:500, color:'#F7F6F2', marginBottom:8 }}>{s.t}</div>
@@ -97,7 +97,7 @@ export default function TradeAssurancePage() {
           <h2 style={{ fontFamily:"'DM Serif Display', serif", fontSize:'clamp(28px, 4vw, 44px)', fontWeight:400, letterSpacing:'-0.03em', marginTop:20, marginBottom:48, lineHeight:1.1 }}>Full protection, every step.</h2>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:16 }}>
             {[
-              {icon:'🛡',t:'Escrow-secured payments',d:'Funds held in your Trade Assurance account and only released when you confirm delivery.'},
+              {icon:'🛡',t:'Trade Assurance-secured payments',d:'Funds held in your Trade Assurance account and only released when you confirm delivery.'},
               {icon:'⚖',t:'Dispute resolution',d:'If something goes wrong, our team mediates based on shipping evidence and tracking.'},
               {icon:'🔄',t:'Refund protection',d:'If goods do not arrive or do not match the listing, buyers can open a dispute and get refunded.'},
               {icon:'📦',t:'Shipment tracking',d:'All transactions require a tracking number before payment is released. Full audit trail.'},

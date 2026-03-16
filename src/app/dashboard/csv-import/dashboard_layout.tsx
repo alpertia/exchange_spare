@@ -12,7 +12,7 @@ const navItems = [
   { label: "My Messages",        href: "/dashboard/messages" },
   { label: "My Transactions",    href: "/dashboard/transactions" },
   { label: "Product Knowledge Base", href: "/dashboard/knowledge" },
-  { label: "My Trade Assurance",  href: "/dashboard/escrow" },
+  { label: "Trade Assurance", href: "/dashboard/trade-assurance" },
   { label: "My Profile",         href: "/dashboard/profile" },
   { label: "Settings",           href: "/dashboard/settings" },
 ]
@@ -21,7 +21,7 @@ const adminNavItems = [
   { label: "🔔 Admin Inbox",     href: "/dashboard/admin/notifications" },
   { label: "🔄 Transactions",    href: "/dashboard/admin/transactions" },
   { label: "💬 Messages",        href: "/dashboard/admin/messages" },
-  { label: "🛡️ Trade Assurance", href: "/dashboard/admin/escrow" },
+  { label: "🛡️ Trade Assurance", href: "/dashboard/admin/trade-assurance" },
   { label: "📄 Deposits",        href: "/dashboard/admin/deposits" },
 ]
 
@@ -215,8 +215,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Trade Assurance Balance — prominent, right below account info */}
         {escrowBalances.length > 0 && (
-          <Link href="/dashboard/escrow" style={{ display: "block", margin: "0", padding: "10px 16px", background: "#f0fdf4", borderBottom: "1px solid #bbf7d0", textDecoration: "none" }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: "#7c3aed", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 4 }}>🔒 Escrow Balance</div>
+          <Link href="/dashboard/trade-assurance" style={{ display: "block", margin: "0", padding: "10px 16px", background: "#f0fdf4", borderBottom: "1px solid #bbf7d0", textDecoration: "none" }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: "#7c3aed", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 4 }}>🛡️ Trade Assurance Balance</div>
             {escrowBalances.map(b => (
               <div key={b.currency} style={{ fontSize: 14, fontWeight: 800, color: "#166534", lineHeight: 1.3 }}>
                 {b.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span style={{ fontSize: 11, fontWeight: 600 }}>{b.currency}</span>

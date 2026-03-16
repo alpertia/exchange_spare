@@ -64,7 +64,7 @@ const NEXT_ACTION: Record<string, { buyer: string; seller: string }> = {
   payment_held:  { buyer: 'Payment confirmed — waiting for admin',  seller: 'Waiting for admin shipment approval' },
   ready_to_ship: { seller: '⚡ Ship the goods & enter tracking',    buyer: 'Waiting for seller to ship' },
   shipped:       { buyer: '⚡ Confirm you received the goods',      seller: 'Waiting for buyer delivery confirmation' },
-  delivered:     { buyer: 'Waiting for admin to release escrow',    seller: 'Waiting for admin to release escrow' },
+  delivered:     { buyer: 'Waiting for admin to release Trade Assurance',    seller: 'Waiting for admin to release Trade Assurance' },
 }
 
 function timeAgo(d: string) {
@@ -225,7 +225,7 @@ export default function TransactionsPage() {
         p_tx_id: payTx.id, p_buyer_company_id: myId, p_amount: amt, p_currency: payTx.currency,
       })
       if (error || !result?.ok) {
-        alert(result?.error || error?.message || 'Escrow failed')
+        alert(result?.error || error?.message || 'Trade Assurance failed')
         setPayBusy(false); return
       }
       await updateTx(payTx.id, { status: 'payment_held', escrow_status: 'held', escrow_amount: amt, escrow_currency: payTx.currency, escrow_held_at: new Date().toISOString() })
@@ -331,7 +331,7 @@ export default function TransactionsPage() {
     }
 
     if (s === 'delivered') {
-      actions.push(<div key="wait" style={{ fontSize: 11, color: '#94a3b8', padding: '4px 0' }}>⏳ Awaiting admin escrow release</div>)
+      actions.push(<div key="wait" style={{ fontSize: 11, color: '#94a3b8', padding: '4px 0' }}>⏳ Awaiting admin Trade Assurance release</div>)
     }
 
     if (!['completed', 'cancelled', 'disputed', 'resolved_buyer', 'resolved_seller', 'resolved_split', 'offer_sent'].includes(s)) {
@@ -364,7 +364,7 @@ export default function TransactionsPage() {
                 {isBuyer ? '🛒 BUY' : '📦 SELL'}
               </span>
               <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 4, background: meta.bg, color: meta.color, fontWeight: 600 }}>{meta.label}</span>
-              {tx.escrow_status === 'held' && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, background: '#f5f3ff', color: '#6d28d9', fontWeight: 600 }}>🔒 escrow held</span>}
+              {tx.escrow_status === 'held' && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, background: '#f5f3ff', color: '#6d28d9', fontWeight: 600 }}>🛡️ Trade Assurance held</span>}
             </div>
 
             {/* Product */}
@@ -414,7 +414,7 @@ export default function TransactionsPage() {
               {tx.notes && <div style={{ gridColumn: '1 / -1' }}><div style={lbl}>Notes</div><div>{tx.notes}</div></div>}
               {tx.escrow_status === 'held' && (
                 <div style={{ gridColumn: '1 / -1', padding: '10px 12px', background: '#f5f3ff', borderRadius: 8, border: '1px solid #ddd6fe' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#6d28d9', marginBottom: 4 }}>🔒 Escrow</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#6d28d9', marginBottom: 4 }}>🛡️ Trade Assurance</div>
                   <div style={{ fontSize: 12, color: '#7c3aed', display: 'flex', gap: 14, flexWrap: 'wrap' }}>
                     <span>Amount: <strong>{tx.escrow_amount} {tx.escrow_currency}</strong></span>
                     {tx.escrow_held_at && <span>Held: {new Date(tx.escrow_held_at).toLocaleDateString()}</span>}
@@ -535,7 +535,7 @@ export default function TransactionsPage() {
 
               <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
                 <button onClick={() => setUseEscrow(true)} style={{ flex: 1, padding: '8px', background: useEscrow ? '#f5f3ff' : 'white', color: useEscrow ? '#6d28d9' : '#64748b', border: `1px solid ${useEscrow ? '#6d28d9' : '#e2e8f0'}`, borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: useEscrow ? 700 : 400 }}>
-                  🔒 Escrow ({escrowBal.toFixed(0)} {payTx.currency} available)
+                  🛡️ Trade Assurance ({escrowBal.toFixed(0)} {payTx.currency} available)
                 </button>
                 <button onClick={() => setUseEscrow(false)} style={{ flex: 1, padding: '8px', background: !useEscrow ? '#fffbeb' : 'white', color: !useEscrow ? '#92400e' : '#64748b', border: `1px solid ${!useEscrow ? '#f59e0b' : '#e2e8f0'}`, borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: !useEscrow ? 700 : 400 }}>
                   🏦 Direct Transfer
@@ -544,7 +544,7 @@ export default function TransactionsPage() {
 
               {useEscrow && insufficient && (
                 <div style={{ padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, fontSize: 12, color: '#dc2626', marginBottom: 12 }}>
-                  ⚠ Insufficient escrow balance — deposit funds first
+                  ⚠ Insufficient Trade Assurance balance — deposit funds first
                 </div>
               )}
               {!useEscrow && (
@@ -589,7 +589,7 @@ export default function TransactionsPage() {
           <div style={{ background: 'white', borderRadius: 12, padding: 24, maxWidth: 420, width: '100%' }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: '#dc2626', marginBottom: 6 }}>⚠ Open Dispute</div>
             <div style={{ padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, fontSize: 12, color: '#dc2626', marginBottom: 14 }}>
-              ❄ Escrow will be frozen. Platform admin will review and decide within 48h.
+              ❄ Trade Assurance will be frozen. Platform admin will review and decide within 48h.
             </div>
             <div style={{ marginBottom: 10 }}><label style={lbl}>Reason *</label><textarea value={dispReason} onChange={e => setDispReason(e.target.value)} style={{ ...inp(), height: 80, resize: 'vertical' }} placeholder="Describe the issue..." /></div>
             <div style={{ marginBottom: 14 }}><label style={lbl}>Evidence URL (optional)</label><input value={dispFile} onChange={e => setDispFile(e.target.value)} style={inp()} placeholder="https://..." /></div>

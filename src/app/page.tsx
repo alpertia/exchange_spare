@@ -104,7 +104,7 @@ export default function LandingPage() {
             that just works.
           </h1>
           <p className="anim-3" style={{ fontSize: 17, color: '#5A5545', lineHeight: 1.75, maxWidth: 480, marginBottom: 40 }}>
-            97,000+ verified part numbers. AI-powered matching. Trade Assurance escrow. Buy and sell with confidence — in minutes, not weeks.
+            97,000+ verified part numbers. AI-powered matching. Trade Assurance. Buy and sell with confidence — in minutes, not weeks.
           </p>
           <div className="anim-4" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             {loggedIn ? (
@@ -121,7 +121,7 @@ export default function LandingPage() {
           <div className="anim-4" style={{ display: 'flex', gap: 40, marginTop: 64, paddingTop: 40, borderTop: '1px solid rgba(0,0,0,0.1)' }}>
             {[
               { n: '97,000+', l: 'Verified PNs' },
-              { n: '100%', l: 'Escrow-secured' },
+              { n: '100%', l: 'Trade Assurance-secured' },
               { n: '< 5 min', l: 'To register' },
             ].map(s => (
               <div key={s.n}>
@@ -144,7 +144,7 @@ export default function LandingPage() {
             {[
               { n: '01', t: 'List or search', d: 'Post inventory or browse 97k+ verified PNs across all major telecom brands.' },
               { n: '02', t: 'Match & offer', d: 'AI matches your buy intent to available stock. Send or receive offers directly.' },
-              { n: '03', t: 'Funds held', d: 'Payment secured in Trade Assurance escrow. Seller ships with confidence.' },
+              { n: '03', t: 'Funds held', d: 'Payment secured in Trade Assurance. Seller ships with confidence.' },
               { n: '04', t: 'Deliver & release', d: 'Buyer confirms delivery. Funds released instantly. Transaction complete.' },
             ].map((s, i) => (
               <div key={i} className="hover-card" style={{ padding: '32px 28px', background: '#0F0F0F', cursor: 'default' }}>
@@ -167,11 +167,11 @@ export default function LandingPage() {
                 Your money moves only<br />when the deal is done.
               </h2>
               <p style={{ fontSize: 15, color: '#5A5545', lineHeight: 1.75, marginBottom: 32 }}>
-                SpareShare holds funds in escrow until the buyer confirms delivery. No wire risk, no unresolved disputes — every transaction is backed by our protection policy.
+                SpareShare holds funds in Trade Assurance until the buyer confirms delivery. No wire risk, no unresolved disputes — every transaction is backed by our protection policy.
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                 {[
-                  { icon: '🛡', t: 'Escrow protection', d: '5% fee on transactions up to €5k, 3% above — no hidden charges.' },
+                  { icon: '🛡', t: 'Trade Assurance protection', d: '5% fee on transactions up to €5k, 3% above — no hidden charges.' },
                   { icon: '⚖', t: 'Dispute resolution', d: 'Our team mediates any dispute and ensures a fair outcome for both parties.' },
                   { icon: '💱', t: 'Multi-currency', d: 'Trade in EUR, USD, GBP and more. Balances held securely in your account.' },
                 ].map(f => (
@@ -193,7 +193,7 @@ export default function LandingPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {[
                   { label: 'Nokia 7750 SR-12 × 2', amount: '+€12,000', status: 'released', color: '#7DB896' },
-                  { label: 'Ericsson RBS 6601', amount: '€8,500 held', status: 'in escrow', color: '#C8A84B' },
+                  { label: 'Ericsson RBS 6601', amount: '€8,500 held', status: 'in Trade Assurance', color: '#C8A84B' },
                   { label: 'Cisco ASR 9006-AC', amount: '+€4,200', status: 'released', color: '#7DB896' },
                 ].map((tx, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: '#161616', borderRadius: 10 }}>
