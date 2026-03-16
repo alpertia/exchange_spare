@@ -1,17 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import nodemailer from 'nodemailer'
+import { Resend } from 'resend'
 import { createClient } from '@supabase/supabase-js'
 
-const transporter = nodemailer.createTransport({
-  host: 'smtp-relay.brevo.com',
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.BREVO_SMTP_LOGIN,
-    pass: process.env.BREVO_SMTP_KEY,
-  },
-})
-const FROM = 'SpareShare <noreply@spareshare.com>'
+const resend = new Resend(process.env.RESEND_API_KEY!)
+const FROM = 'SpareShare <noreply@ant-soft.uk>'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -33,7 +25,6 @@ async function getCompanyEmail(companyId: string): Promise<string | null> {
 }
 
 async function getAdminEmail(): Promise<string | null> {
-  // Get admin profile id first
   const { data: profile } = await supabaseAdmin
     .from('profiles')
     .select('id')
@@ -41,7 +32,6 @@ async function getAdminEmail(): Promise<string | null> {
     .limit(1)
     .single()
   if (!profile?.id) return null
-  // Get email from auth.users via admin API
   const { data: user } = await supabaseAdmin.auth.admin.getUserById(profile.id)
   return user?.user?.email ?? null
 }
@@ -50,12 +40,15 @@ function baseStyle() {
   return `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; background: #ffffff;">
       <div style="background: #0f172a; padding: 20px 28px; border-radius: 8px 8px 0 0;">
-        <span style="color: #ffffff; font-size: 18px; font-weight: 900; letter-spacing: -0.03em;">SpareShare</span>
+        <span style="font-family:'DM Serif Display','Georgia',serif; color: #ffffff; font-size: 20px; font-weight: 700; letter-spacing: -0.03em;">
+          <span style="color:white;">Spare</span><span style="color:#185FA5;">Share</span>
+        </span>
         <span style="color: #00C878; font-size: 9px; font-weight: 600; margin-left: 8px; letter-spacing: 0.06em; text-transform: uppercase;">with Trade Assurance</span>
       </div>
       <div style="padding: 28px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 8px 8px;">
   `
 }
+
 function baseClose() {
   return `
       </div>
@@ -70,7 +63,6 @@ function baseClose() {
 // ── Email templates ───────────────────────────────────────────────────────────
 const templates: Record<string, (d: any) => { subject: string; html: string }> = {
 
-  // Deposit başvurusu → Admin'e
   deposit_request: (d) => ({
     subject: `💰 New Deposit Application — ${d.amount} ${d.currency}`,
     html: baseStyle() + `
@@ -91,7 +83,6 @@ const templates: Record<string, (d: any) => { subject: string; html: string }> =
     ` + baseClose(),
   }),
 
-  // Deposit onaylandı → Kullanıcıya
   deposit_approved: (d) => ({
     subject: `✅ Deposit Approved — ${d.amount} ${d.currency} added to your Trade Assurance balance`,
     html: baseStyle() + `
@@ -108,7 +99,6 @@ const templates: Record<string, (d: any) => { subject: string; html: string }> =
     ` + baseClose(),
   }),
 
-  // TX: Offer kabul edildi → Seller'a
   tx_confirmed: (d) => ({
     subject: `🤝 Offer Accepted — ${d.pn} (${d.quantity} units)`,
     html: baseStyle() + `
@@ -127,7 +117,6 @@ const templates: Record<string, (d: any) => { subject: string; html: string }> =
     ` + baseClose(),
   }),
 
-  // TX: Ödeme yapıldı → Seller'a
   tx_payment_held: (d) => ({
     subject: `🔒 Payment Secured — ${d.amount} ${d.currency} held in Trade Assurance`,
     html: baseStyle() + `
@@ -146,25 +135,18 @@ const templates: Record<string, (d: any) => { subject: string; html: string }> =
       </table>
       <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/transactions"
          style="display: inline-block; padding: 10px 20px; background: #0f172a; color: white; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 700;">
-        Mark as Ready to Ship →
+        View Transaction →
       </a>
     ` + baseClose(),
   }),
 
-  // TX: Kargoya verildi → Buyer'a
   tx_shipped: (d) => ({
-    subject: `📦 Shipped — ${d.pn} · Tracking: ${d.tracking}`,
+    subject: `📦 Shipment Dispatched — ${d.pn}`,
     html: baseStyle() + `
       <h2 style="margin: 0 0 8px; font-size: 18px; color: #0f172a;">Your order has been shipped</h2>
-      <p style="color: #64748b; font-size: 13px; margin: 0 0 20px;">The seller has dispatched your order. Please confirm delivery once received.</p>
-      <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px;">
-        <tr><td style="padding: 7px 0; color: #64748b; width: 140px;">Part Number</td><td style="font-weight: 700; color: #0f172a;">${d.pn}</td></tr>
-        <tr><td style="padding: 7px 0; color: #64748b;">Tracking Number</td><td style="color: #1e40af; font-weight: 700;">${d.tracking}</td></tr>
-        <tr><td style="padding: 7px 0; color: #64748b;">Quantity</td><td style="color: #0f172a;">${d.quantity} units</td></tr>
-      </table>
-      <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 12px 16px; font-size: 12px; color: #92400e; margin-bottom: 20px;">
-        ⚠️ <strong>Important:</strong> Confirm delivery only after inspecting the equipment. Payment will be released to the seller upon your confirmation.
-      </div>
+      <p style="color: #64748b; font-size: 13px; margin: 0 0 20px;">
+        The seller has dispatched <strong>${d.pn}</strong>. Please confirm delivery once received.
+      </p>
       <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/transactions"
          style="display: inline-block; padding: 10px 20px; background: #0f172a; color: white; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 700;">
         Confirm Delivery →
@@ -172,7 +154,6 @@ const templates: Record<string, (d: any) => { subject: string; html: string }> =
     ` + baseClose(),
   }),
 
-  // TX: Teslim onaylandı → Seller'a
   tx_delivered: (d) => ({
     subject: `✅ Delivery Confirmed — Payment being released`,
     html: baseStyle() + `
@@ -192,7 +173,6 @@ const templates: Record<string, (d: any) => { subject: string; html: string }> =
     ` + baseClose(),
   }),
 
-  // TX: Dispute açıldı → Admin'e
   tx_disputed: (d) => ({
     subject: `⚠️ Dispute Opened — TX ${d.tx_id.slice(0, 8)} · ${d.pn}`,
     html: baseStyle() + `
@@ -212,7 +192,6 @@ const templates: Record<string, (d: any) => { subject: string; html: string }> =
     ` + baseClose(),
   }),
 
-  // AI kredi satın alındı → Kullanıcıya
   consultant_inquiry: (d) => ({
     subject: `📋 Consultant Inquiry — ${d.topic || 'General'} · ${d.name}`,
     html: baseStyle() + `
@@ -245,7 +224,7 @@ const templates: Record<string, (d: any) => { subject: string; html: string }> =
         ${d.preview}
       </div>
       <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/messages"
-        style="display: inline-block; background: #1e40af; color: white; padding: 10px 22px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 600;">
+        style="display: inline-block; background: #185FA5; color: white; padding: 10px 22px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 600;">
         Reply in Messages →
       </a>
     ` + baseClose(),
@@ -257,7 +236,7 @@ const templates: Record<string, (d: any) => { subject: string; html: string }> =
       <h2 style="margin: 0 0 8px; font-size: 18px; color: #0f172a;">AI Credits Added 🤖</h2>
       <p style="color: #64748b; font-size: 13px; margin: 0 0 20px;">Your purchase was successful. Credits have been added to your account.</p>
       <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px;">
-        <div style="font-size: 28px; font-weight: 900; color: #1e40af;">+10 Credits</div>
+        <div style="font-size: 28px; font-weight: 900; color: #185FA5;">+10 Credits</div>
         <div style="font-size: 12px; color: #64748b; margin-top: 4px;">$${d.amount} charged · Credits never expire</div>
       </div>
       <p style="font-size: 12px; color: #64748b;">Use your credits for AI-powered product Q&amp;A, part number matching, and compatibility analysis across the SpareShare Knowledge Base.</p>
@@ -271,8 +250,6 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     console.log('EMAIL ROUTE body:', JSON.stringify(body))
     const { type, data } = body
-    console.log('Available templates:', Object.keys(templates))
-    console.log('Type lookup:', type, !!templates[type])
 
     if (!type || !templates[type]) {
       return NextResponse.json({ error: 'Unknown email type', type, available: Object.keys(templates) }, { status: 400 })
@@ -280,25 +257,20 @@ export async function POST(req: NextRequest) {
 
     const template = templates[type](data)
 
-    // Determine recipient
     let to: string | null = null
 
-    // Admin emails
-    if (['deposit_request', 'tx_disputed'].includes(type)) {
+    if (['deposit_request', 'tx_disputed', 'consultant_inquiry'].includes(type)) {
       to = await getAdminEmail()
-    }
-    // Company emails
-    else if (data.company_id) {
+    } else if (data.company_id) {
       to = await getCompanyEmail(data.company_id)
     }
-    // Explicit to
     if (data.to) to = data.to
 
     if (!to) {
       return NextResponse.json({ error: 'No recipient found' }, { status: 400 })
     }
 
-    await transporter.sendMail({
+    await resend.emails.send({
       from: FROM,
       to,
       subject: template.subject,
