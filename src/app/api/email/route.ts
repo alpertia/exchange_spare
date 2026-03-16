@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { createClient } from '@supabase/supabase-js'
 
-const resend = new Resend(process.env.RESEND_API_KEY!)
+const getResend = () => new Resend(process.env.RESEND_API_KEY!)
 const FROM = 'SpareShare <noreply@ant-soft.uk>'
 
 const supabaseAdmin = createClient(
@@ -270,7 +270,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No recipient found' }, { status: 400 })
     }
 
-    await resend.emails.send({
+    await getResend().emails.send({
       from: FROM,
       to,
       subject: template.subject,
