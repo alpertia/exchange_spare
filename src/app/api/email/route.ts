@@ -3,7 +3,7 @@ import { Resend } from 'resend'
 import { createClient } from '@supabase/supabase-js'
 
 const getResend = () => new Resend(process.env.RESEND_API_KEY!)
-const FROM = 'SpareShare <noreply@ant-soft.uk>'
+const FROM = process.env.EMAIL_FROM ?? 'SpareShare <noreply@mail.ant-soft.uk>'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -92,7 +92,7 @@ const templates: Record<string, (d: any) => { subject: string; html: string }> =
         <div style="font-size: 28px; font-weight: 900; color: #15803d;">+${d.amount} ${d.currency}</div>
         <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Added to Trade Assurance Balance</div>
       </div>
-      <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/escrow"
+      <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/trade-assurance"
          style="display: inline-block; padding: 10px 20px; background: #15803d; color: white; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 700;">
         View Balance →
       </a>
@@ -122,7 +122,7 @@ const templates: Record<string, (d: any) => { subject: string; html: string }> =
     html: baseStyle() + `
       <h2 style="margin: 0 0 8px; font-size: 18px; color: #0f172a;">Payment is secured</h2>
       <p style="color: #64748b; font-size: 13px; margin: 0 0 20px;">
-        The buyer has transferred <strong>${d.amount} ${d.currency}</strong> to Trade Assurance escrow. 
+        The buyer has transferred <strong>${d.amount} ${d.currency}</strong> to Trade Assurance. 
         Please prepare the shipment.
       </p>
       <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px;">
@@ -166,7 +166,7 @@ const templates: Record<string, (d: any) => { subject: string; html: string }> =
         <div style="font-size: 24px; font-weight: 900; color: #15803d;">${d.amount} ${d.currency}</div>
         <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Being released to your Trade Assurance balance</div>
       </div>
-      <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/escrow"
+      <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/trade-assurance"
          style="display: inline-block; padding: 10px 20px; background: #15803d; color: white; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 700;">
         View Balance →
       </a>
@@ -226,6 +226,18 @@ const templates: Record<string, (d: any) => { subject: string; html: string }> =
       <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/messages"
         style="display: inline-block; background: #185FA5; color: white; padding: 10px 22px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 600;">
         Reply in Messages →
+      </a>
+    ` + baseClose(),
+  }),
+
+  welcome: (d) => ({
+    subject: `👋 Welcome to SpareShare — ${d.company_name}`,
+    html: baseStyle() + `
+      <h2 style="margin: 0 0 8px; font-size: 18px; color: #0f172a;">Welcome to SpareShare 👋</h2>
+      <p style="color: #64748b; font-size: 13px; margin: 0 0 20px;">Your account has been created. You can now access the B2B telecom marketplace.</p>
+      <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/login"
+         style="display: inline-block; padding: 10px 20px; background: #0f172a; color: white; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 700;">
+        Go to Dashboard →
       </a>
     ` + baseClose(),
   }),
