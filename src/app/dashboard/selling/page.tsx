@@ -36,7 +36,7 @@ type ProductEditForm = {
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const EMPTY: Row = { pn: '', brand: '', model: '', qty: '', price: '', currency: 'EUR', condition: 'Used', warehouse_location: '', notes: '', description: '', manufacture_date: '', stock_entry_date: '' }
+const EMPTY: Row = { pn: '', brand: '', model: '', qty: '', price: '', currency: 'EUR', condition: 'Used', warehouse_location: '', notes: '', description: '', manufacture_date: '', stock_entry_date: '', condition_image: '' }
 const CONDITIONS = ['New', 'Used', 'Refurbished', 'New with Box', 'New Open Box', 'Brand New']
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'CNY']
 const CURRENCY_SYMBOL: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', CNY: '¥' }
@@ -120,7 +120,7 @@ export default function SellingPage() {
 
   // Edit
   const [editing, setEditing]         = useState(false)
-  const [editForm, setEditForm]       = useState<EditForm>({ quantity: '', price: '', currency: 'EUR', condition: 'Used', warehouse_location: '', notes: '', manufacture_date: '', stock_entry_date: '' })
+  const [editForm, setEditForm]       = useState<EditForm>({ quantity: '', price: '', currency: 'EUR', condition: 'Used', warehouse_location: '', notes: '', manufacture_date: '', stock_entry_date: '', condition_image: '' })
   const [editSaving, setEditSaving]   = useState(false)
   const [editImgUrl, setEditImgUrl]   = useState<string | null>(null)
   const [condImgUploading, setCondImgUploading] = useState(false)
@@ -262,7 +262,7 @@ export default function SellingPage() {
 
   // ── Edit ──────────────────────────────────────────────────────────────────
   function openEdit(l: Listing) {
-    setEditForm({ quantity: l.quantity ? String(l.quantity) : '', price: l.price ? String(l.price) : '', currency: l.currency || 'EUR', condition: l.condition || 'used', warehouse_location: l.warehouse_location || '', notes: l.notes || '', manufacture_date: l.manufacture_date || '', stock_entry_date: l.stock_entry_date || '' })
+    setEditForm({ quantity: l.quantity ? String(l.quantity) : '', price: l.price ? String(l.price) : '', currency: l.currency || 'EUR', condition: l.condition || 'Used', warehouse_location: l.warehouse_location || '', notes: l.notes || '', manufacture_date: l.manufacture_date || '', stock_entry_date: l.stock_entry_date || '', condition_image: l.condition_images?.[0] ?? '' })
     setEditImgUrl(l.condition_images?.[0] ?? null)
     setEditing(true)
   }
@@ -545,7 +545,7 @@ export default function SellingPage() {
         if (!qtyRaw && obj.qty) warnings.push(`Row ${idx + 2}: qty "${obj.qty}" could not be parsed`)
         const { price, currency: priceCurrency } = parsePrice(obj.price || '')
         const notesExtra = (obj.condition || '').toUpperCase().includes('LANDED') ? 'LANDED' : ''
-        rows.push({ pn, brand: (obj.brand || '').toUpperCase(), model: obj.model || '', description: obj.model && obj.description ? `${obj.model} — ${obj.description}` : obj.model || obj.description || '', qty: qtyRaw, price, currency: obj.currency || (hasCurrency ? '' : priceCurrency) || 'EUR', condition: normCondition(obj.condition || ''), warehouse_location: obj.warehouse_location || obj.country || '', notes: [obj.notes, notesExtra].filter(Boolean).join(' '), manufacture_date: obj.manufacture_date || '', stock_entry_date: obj.stock_entry_date || obj.date || '' })
+        rows.push({ pn, brand: (obj.brand || '').toUpperCase(), model: obj.model || '', description: obj.model && obj.description ? `${obj.model} — ${obj.description}` : obj.model || obj.description || '', qty: qtyRaw, price, currency: obj.currency || (hasCurrency ? '' : priceCurrency) || 'EUR', condition: normCondition(obj.condition || ''), warehouse_location: obj.warehouse_location || obj.country || '', notes: [obj.notes, notesExtra].filter(Boolean).join(' '), manufacture_date: obj.manufacture_date || '', stock_entry_date: obj.stock_entry_date || obj.date || '', condition_image: '' })
       })
       if (rows.length === 0) { setErr('No valid rows found'); return }
       setParseWarnings(warnings); setCsvRows(rows)

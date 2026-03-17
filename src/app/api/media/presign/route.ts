@@ -23,7 +23,8 @@ export async function POST(req: NextRequest) {
   const ext = fileName.split('.').pop()?.toLowerCase() ?? 'jpg'
   const folder = isVideo ? 'videos' : 'raw'
   const key = `${folder}/${listingId ?? 'draft'}/${randomUUID()}.${ext}`
-  const presignedUrl = await getSignedUrl(s3, new PutObjectCommand({ Bucket: process.env.AWS_S3_BUCKET!, Key: key, ContentType: fileType }), { expiresIn: 300 })
+  const command = new PutObjectCommand({ Bucket: process.env.AWS_S3_BUCKET!, Key: key, ContentType: fileType })
+  const presignedUrl = await getSignedUrl(s3, command, { expiresIn: 300 })
   const publicUrl = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`
   return NextResponse.json({ presignedUrl, key, publicUrl })
 }
