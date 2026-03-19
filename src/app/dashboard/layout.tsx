@@ -41,8 +41,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [buyBadge, setBuyBadge]         = useState(0)
   const [sellBadge, setSellBadge]       = useState(0)
   const [escrowBalances, setEscrowBalances] = useState<{ currency: string; balance: number }[]>([])
+  const [aiCredits, setAiCredits]             = useState<number | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   useEffect(() => { init() }, [])
+
+
 
   async function init() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -62,6 +67,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       loadTxBadge(profile.company_id)
       loadEscrowBalances(profile.company_id)
       loadBuySellBadges(profile.company_id)
+      loadAiCredits(profile.company_id)
     }
 
     if ((profile as any)?.role === "admin") {
@@ -112,6 +118,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     setEscrowBalances(data || [])
   }
 
+  async function loadAiCredits(companyId: string) {
+    const { data } = await supabase
+      .from("ai_credits")
+      .select("credits_free, credits_total, credits_used")
+      .eq("company_id", companyId)
+      .single()
+    if (data) {
+      const remaining = (data.credits_free + data.credits_total) - data.credits_used
+      setAiCredits(Math.max(0, remaining))
+    }
+  }
+
   async function loadBuySellBadges(companyId: string) {
     const [buyRes, sellRes] = await Promise.all([
       supabase.from("transactions").select("*", { count: "exact", head: true })
@@ -132,6 +150,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         () => { loadTxBadge(myCompanyId); loadBuySellBadges(myCompanyId) })
       .on("postgres_changes", { event: "*", schema: "public", table: "escrow_balances", filter: `company_id=eq.${myCompanyId}` },
         () => loadEscrowBalances(myCompanyId))
+      .on("postgres_changes", { event: "*", schema: "public", table: "ai_credits", filter: `company_id=eq.${myCompanyId}` },
+        () => loadAiCredits(myCompanyId))
       .subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [myCompanyId])
@@ -181,15 +201,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", fontFamily: "'DM Sans', system-ui, sans-serif", background: "#F7F6F2" }}>
+    <div style={{ display:"flex", minHeight: "100vh", fontFamily: "'DM Sans', system-ui, sans-serif", background: "#F7F6F2" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&display=swap');
         * { box-sizing: border-box; }
         body { background: #F7F6F2; margin: 0; }
+        @media (max-width: 768px) {
+          .sidebar { position: fixed !important; left: 0; top: 0; z-index: 999; transform: translateX(-100%); transition: transform 0.25s ease; height: 100vh !important; }
+          .sidebar.open { transform: translateX(0) !important; }
+          .mobile-topbar { display: block !important; }
+          .main-content { width: 100% !important; }
+          .main-padding { padding: 16px !important; padding-top: 68px !important; }
+        }
       `}</style>
 
+      {/* Mobile top bar */}
+      <div style={{ display: "none" }} className="mobile-topbar">
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, height: 52, background: "#EEEBE3", borderBottom: "1px solid rgba(0,0,0,0.08)", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 16px", zIndex: 1000 }}>
+          <Logo size={24} linkTo="/" />
+          <button onClick={() => setMobileMenuOpen(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "#0A0A0A" }}>{mobileMenuOpen ? "✕" : "☰"}</button>
+        </div>
+      </div>
+
       {/* SIDEBAR */}
-      <div style={{ width: 220, background: "#EEEBE3", borderRight: "1px solid rgba(0,0,0,0.08)", display: "flex", flexDirection: "column", flexShrink: 0, height: "100vh", position: "sticky", top: 0, overflow: "hidden" }}>
+      <div className={`sidebar${mobileMenuOpen ? " open" : ""}`} style={{ width: 220, background: "#EEEBE3", borderRight: "1px solid rgba(0,0,0,0.08)", display: "flex", flexDirection: "column", flexShrink: 0, height: "100vh", position: "sticky", top: 0, overflow: "hidden" }}>
 
         {/* Logo */}
         <div style={{ padding: "20px 16px 14px", borderBottom: "1px solid rgba(0,0,0,0.08)" }}>
@@ -217,6 +252,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <span style={{ fontSize: 10, fontWeight: 600, color: "#5A5545", fontFamily: "'DM Sans', sans-serif" }}>{b.currency}</span>
               </div>
             ))}
+          </Link>
+        )}
+
+        {/* AI Credits */}
+        {aiCredits !== null && (
+          <Link href="/dashboard/settings" style={{ display: "block", padding: "10px 16px", background: aiCredits === 0 ? "#fef2f2" : "#EAE7DF", borderBottom: "1px solid rgba(0,0,0,0.08)", textDecoration: "none" }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: aiCredits === 0 ? "#dc2626" : "#5A5545", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 3 }}>🤖 AI Queries</div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+              <span style={{ fontSize: 18, fontWeight: 700, color: aiCredits === 0 ? "#dc2626" : "#0A0A0A", fontFamily: "'DM Mono', monospace" }}>{aiCredits}</span>
+              <span style={{ fontSize: 10, color: aiCredits === 0 ? "#dc2626" : "#8A8070" }}>remaining</span>
+            </div>
+            {aiCredits === 0 && (
+              <div style={{ fontSize: 10, color: "#dc2626", marginTop: 2, fontWeight: 600 }}>⚠ No credits left</div>
+            )}
           </Link>
         )}
 
@@ -258,8 +307,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
 
       {/* MAIN */}
-      <div style={{ flex: 1, background: "#F7F6F2", minWidth: 0 }}>
-        <div style={{ padding: 32 }}>
+      <div style={{ flex:1, background: "#F7F6F2", minWidth:0 }}>
+        <div className="main-padding" style={{ padding: 32 }}>
           {children}
         </div>
       </div>

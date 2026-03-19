@@ -4,26 +4,28 @@ import Link from 'next/link'
 export default function MarketplacePage() {
   return (
     <>
-{/* HERO */}
-      <section style={{ padding: '140px 48px 80px', maxWidth: 860, margin: '0 auto', textAlign: 'center' }}>
-        <div className="a1"><span className="tag" style={{ background: '#E6F1FB', color: '#0C447C' }}>Marketplace</span></div>
-        <h1 className="a2" style={{ fontFamily: "'DM Serif Display', serif", fontSize: 'clamp(40px, 6vw, 68px)', fontWeight: 400, lineHeight: 1.08, letterSpacing: '-0.03em', marginTop: 24, marginBottom: 24 }}>
-          Buy and sell telecom parts<br /><em style={{ fontStyle: 'italic', color: '#185FA5' }}>with confidence.</em>
-        </h1>
-        <p className="a3" style={{ fontSize: 17, color: '#5A5545', lineHeight: 1.75, maxWidth: 520, margin: '0 auto 40px' }}>
-          97,000+ verified part numbers. Post inventory, find what you need, and close deals — protected by Trade Assurance.
-        </p>
-        <div className="a3" style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <Link href="/register" className="btn-main">Start trading free →</Link>
-              <Link href="/login" className="btn-ghost">Log in</Link>
+      {/* HERO */}
+      <section style={{ paddingTop: 140, paddingBottom: 80 }} className="px-6 md:px-12">
+        <div style={{ maxWidth: 860, margin: '0 auto', textAlign: 'center' }}>
+          <div className="a1"><span className="tag" style={{ background: '#E6F1FB', color: '#0C447C' }}>Marketplace</span></div>
+          <h1 className="a2" style={{ fontFamily: "'DM Serif Display', serif", fontSize: 'clamp(40px, 6vw, 68px)', fontWeight: 400, lineHeight: 1.08, letterSpacing: '-0.03em', marginTop: 24, marginBottom: 24 }}>
+            Buy and sell telecom parts<br /><em style={{ fontStyle: 'italic', color: '#185FA5' }}>with confidence.</em>
+          </h1>
+          <p className="a3" style={{ fontSize: 17, color: '#5A5545', lineHeight: 1.75, maxWidth: 520, margin: '0 auto 40px' }}>
+            97,000+ verified part numbers. Post inventory, find what you need, and close deals — protected by Trade Assurance.
+          </p>
+          <div className="a3" style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <Link href="/register" className="btn-main">Start trading free →</Link>
+            <Link href="/login" className="btn-ghost">Log in</Link>
+          </div>
         </div>
       </section>
 
       {/* MOCK LISTINGS */}
-      <section style={{ padding: '60px 48px', background: '#0A0A0A' }}>
+      <section style={{ background: '#0A0A0A' }} className="py-16 px-6 md:px-12">
         <div style={{ maxWidth: 960, margin: '0 auto' }}>
           <div style={{ fontSize: 11, color: '#3A3A3A', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 20 }}>Live listings preview</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {[
               { pn: '7750 SR-12', brand: 'Nokia', qty: 2, price: '€14,500', tag: 'For Sale', tagBg: '#E6F1FB', tagColor: '#0C447C' },
               { pn: 'ASR9006-AC', brand: 'Cisco', qty: 1, price: '€8,200', tag: 'For Sale', tagBg: '#E6F1FB', tagColor: '#0C447C' },
@@ -49,13 +51,13 @@ export default function MarketplacePage() {
       </section>
 
       {/* FEATURES */}
-      <section style={{ padding: '80px 48px', background: '#F7F6F2' }}>
+      <section style={{ background: '#F7F6F2' }} className="py-20 px-6 md:px-12">
         <div style={{ maxWidth: 960, margin: '0 auto' }}>
           <span className="tag">Platform features</span>
           <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 'clamp(28px, 4vw, 44px)', fontWeight: 400, letterSpacing: '-0.03em', marginTop: 20, marginBottom: 48, lineHeight: 1.1 }}>
             Everything you need<br /><em style={{ color: '#185FA5' }}>to trade B2B.</em>
           </h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[
               { icon: '📋', t: 'List inventory', d: 'Post your surplus stock in minutes. AI fills in product details from the part number automatically.' },
               { icon: '🔍', t: 'Post buy intents', d: 'Tell the market what you need. Sellers with matching stock will reach out directly.' },
@@ -75,9 +77,9 @@ export default function MarketplacePage() {
       </section>
 
       {/* HOW BUYING WORKS */}
-      <section style={{ padding: '80px 48px', background: '#EDEBE3' }}>
+      <section style={{ background: '#EDEBE3' }} className="py-20 px-6 md:px-12">
         <div style={{ maxWidth: 960, margin: '0 auto' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 64 }}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-16">
             <div>
               <span className="tag" style={{ background: '#E6F1FB', color: '#0C447C' }}>For buyers</span>
               <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 'clamp(24px, 3vw, 36px)', fontWeight: 400, letterSpacing: '-0.03em', marginTop: 20, marginBottom: 32, lineHeight: 1.15 }}>
@@ -127,7 +129,7 @@ export default function MarketplacePage() {
       </section>
 
       {/* CTA */}
-      <section style={{ padding: '80px 48px', background: '#185FA5', textAlign: 'center' }}>
+      <section style={{ background: '#185FA5', textAlign: 'center' }} className="py-20 px-6 md:px-12">
         <span className="tag" style={{ background: 'rgba(255,255,255,0.15)', color: 'white' }}>Join the marketplace</span>
         <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 'clamp(28px, 4vw, 52px)', fontWeight: 400, letterSpacing: '-0.03em', color: 'white', marginTop: 20, marginBottom: 16, lineHeight: 1.1 }}>
           Start buying and selling today.
@@ -137,11 +139,11 @@ export default function MarketplacePage() {
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
           <Link href="/register" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'white', color: '#185FA5', padding: '13px 28px', borderRadius: 100, fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>
-                Create free account →
-              </Link>
-              <Link href="/login" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'transparent', color: 'white', border: '1.5px solid rgba(255,255,255,0.4)', padding: '13px 28px', borderRadius: 100, fontSize: 14, textDecoration: 'none' }}>
-                Log in
-              </Link>
+            Create free account →
+          </Link>
+          <Link href="/login" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'transparent', color: 'white', border: '1.5px solid rgba(255,255,255,0.4)', padding: '13px 28px', borderRadius: 100, fontSize: 14, textDecoration: 'none' }}>
+            Log in
+          </Link>
         </div>
       </section>
     </>
