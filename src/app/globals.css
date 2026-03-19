@@ -52,3 +52,7 @@ input, select, textarea, button {
   .nav-buttons a { padding: 6px 12px !important; font-size: 11px !important; }
   nav { padding: 0 16px !important; height: 52px !important; }
 }
+
+@media (max-width: 768px) {
+  .nav-logo-wrap span[style] { font-size: 18px !important; }
+}

@@ -57,7 +57,7 @@ export default function LandingPage() {
         borderBottom: scrolled ? '1px solid rgba(0,0,0,0.08)' : 'none',
         transition: 'all 0.3s ease',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }} className="nav-logo-wrap">
           <Logo size={30} linkTo="/" />
         </div>
         <div className="nav-links" style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
