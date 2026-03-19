@@ -29,3 +29,20 @@ input, select, textarea, button {
 .sidebar-wrapper a.active-nav {
   color: #f1f5f9 !important;
 }
+@media (max-width: 768px) {
+  .nav-links { display: none !important; }
+  .nav-buttons a { padding: 8px 14px !important; font-size: 12px !important; }
+}
+
+@media (max-width: 768px) {
+  .nav-logo svg { width: 16px !important; }
+  .nav-logo span { font-size: 13px !important; }
+  .nav-links { display: none !important; }
+  .nav-buttons a { padding: 6px 12px !important; font-size: 11px !important; }
+}
+
+@media (max-width: 640px) {
+  nav { padding: 0 16px !important; }
+  .nav-links { display: none !important; }
+  .nav-buttons a { padding: 6px 10px !important; font-size: 11px !important; }
+}

@@ -60,7 +60,7 @@ export default function LandingPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Logo size={30} linkTo="/" />
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
+        <div className="nav-links" style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
           {[
             { label: 'Marketplace', href: '/marketplace' },
             { label: 'Trade Assurance', href: '/trade-assurance' },
@@ -74,7 +74,7 @@ export default function LandingPage() {
             </Link>
           ))}
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div className="nav-buttons" style={{ display: 'flex', gap: 10 }}>
           {loggedIn ? (
             <Link href="/dashboard/marketplace" className="btn-main" style={{ padding: '10px 20px', fontSize: 13 }}>My SpareShare →</Link>
           ) : (
