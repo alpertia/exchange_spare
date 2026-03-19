@@ -369,12 +369,17 @@ export default function LandingPage() {
           <span style={{ fontSize: 11, color: '#3A3A3A' }}>· B2B Exchange with Trade Assurance</span>
         </div>
         <div style={{ display: 'flex', gap: 24, fontSize: 12 }}>
-          {['Trade Assurance', 'Privacy', 'Terms', 'Contact'].map(l => (
-            <span key={l} style={{ cursor: 'pointer', transition: 'color 0.2s' }}
+          {[
+            { l: 'Trade Assurance', href: '/trade-assurance' },
+            { l: 'Privacy', href: '/privacy' },
+            { l: 'Terms', href: '/terms' },
+            { l: 'Contact', href: 'mailto:mail@ant-soft.uk' },
+          ].map(item => (
+            <a key={item.l} href={item.href} style={{ cursor: 'pointer', transition: 'color 0.2s', color: '#6A6A6A', textDecoration: 'none' }}
               onMouseEnter={e => (e.target as HTMLElement).style.color = '#F7F6F2'}
               onMouseLeave={e => (e.target as HTMLElement).style.color = '#6A6A6A'}>
-              {l}
-            </span>
+              {item.l}
+            </a>
           ))}
         </div>
         <div style={{ fontSize: 12 }}>© 2026 SpareShare</div>
