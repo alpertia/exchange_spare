@@ -130,7 +130,7 @@ export default function LandingPage() {
       )}
 
       {/* HERO */}
-      <section style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: isMobile ? '100px 20px 60px' : '120px 48px 80px', position: 'relative', overflow: 'hidden' }}>
+      <section style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: isMobile ? '100px 20px 80px' : '120px 48px 80px', position: 'relative', overflow: isMobile ? 'visible' : 'hidden' }}>
         {/* Background grid */}
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px)', backgroundSize: '48px 48px', pointerEvents: 'none' }} />
         {/* Accent circle */}
@@ -161,7 +161,7 @@ export default function LandingPage() {
           </div>
 
           {/* Stats row */}
-          <div className="anim-4" style={{ display: 'flex', gap: isMobile ? 24 : 40, marginTop: isMobile ? 48 : 64, flexWrap:'wrap', paddingTop: 40, borderTop: '1px solid rgba(0,0,0,0.1)' }}>
+          <div className="anim-4" style={{ display: 'flex', gap: isMobile ? 20 : 40, marginTop: isMobile ? 40 : 64, flexWrap:'wrap', paddingBottom: isMobile ? 8 : 0, paddingTop: 40, borderTop: '1px solid rgba(0,0,0,0.1)' }}>
             {[
               { n: '97,000+', l: 'Verified PNs' },
               { n: '100%', l: 'Trade Assurance-secured' },
