@@ -7,6 +7,8 @@ export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false)
   const [visible, setVisible] = useState(false)
   const [loggedIn, setLoggedIn] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+  const [navOpen,  setNavOpen]  = useState(false)
 
   useEffect(() => {
     setVisible(true)
@@ -19,6 +21,13 @@ export default function LandingPage() {
       })
     })
     return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  useEffect(() => {
+    const chk = () => setIsMobile(window.innerWidth < 768)
+    chk()
+    window.addEventListener('resize', chk)
+    return () => window.removeEventListener('resize', chk)
   }, [])
 
   return (
@@ -51,15 +60,16 @@ export default function LandingPage() {
       <nav style={{
         position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 48px', height: 64,
+        padding: isMobile ? '0 16px' : '0 48px', height: 64,
         background: scrolled ? 'rgba(247,246,242,0.92)' : 'transparent',
         backdropFilter: scrolled ? 'blur(12px)' : 'none',
         borderBottom: scrolled ? '1px solid rgba(0,0,0,0.08)' : 'none',
         transition: 'all 0.3s ease',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }} className="nav-logo-wrap">
-          <Logo size={30} linkTo="/" />
+          <Logo size={isMobile ? 20 : 30} linkTo="/" />
         </div>
+        {!isMobile && (
         <div className="nav-links" style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
           {[
             { label: 'Marketplace', href: '/marketplace' },
@@ -74,6 +84,7 @@ export default function LandingPage() {
             </Link>
           ))}
         </div>
+        )}
         <div className="nav-buttons" style={{ display: 'flex', gap: 10 }}>
           {loggedIn ? (
             <Link href="/dashboard/marketplace" className="btn-main" style={{ padding: '10px 20px', fontSize: 13 }}>My SpareShare →</Link>
@@ -83,11 +94,43 @@ export default function LandingPage() {
               <Link href="/register" className="btn-main" style={{ padding: '10px 20px', fontSize: 13 }}>Get started</Link>
             </>
           )}
+          {isMobile && (
+            <button onClick={() => setNavOpen(o => !o)} style={{ background:'none', border:'none', cursor:'pointer', padding:6, display:'flex', flexDirection:'column', gap:4, marginLeft:4 }}>
+              <span style={{ display:'block', width:20, height:2, background:'#0A0A0A', borderRadius:2, transition:'0.2s', transform: navOpen ? 'rotate(45deg) translate(4px,4px)' : 'none' }}/>
+              <span style={{ display:'block', width:20, height:2, background:'#0A0A0A', borderRadius:2, transition:'0.2s', opacity: navOpen ? 0 : 1 }}/>
+              <span style={{ display:'block', width:20, height:2, background:'#0A0A0A', borderRadius:2, transition:'0.2s', transform: navOpen ? 'rotate(-45deg) translate(4px,-4px)' : 'none' }}/>
+            </button>
+          )}
         </div>
       </nav>
+      {isMobile && navOpen && (
+        <div style={{ position:'fixed', top:64, left:0, right:0, zIndex:99, background:'rgba(247,246,242,0.98)', backdropFilter:'blur(12px)', borderBottom:'1px solid rgba(0,0,0,0.1)', padding:'8px 20px 20px' }}>
+          {[
+            { label: 'Marketplace', href: '/marketplace' },
+            { label: 'Trade Assurance', href: '/trade-assurance' },
+            { label: 'Knowledge Base', href: '/knowledge-base' },
+            { label: 'Consultants', href: '/consultants' },
+          ].map(item => (
+            <a key={item.label} href={item.href} onClick={() => setNavOpen(false)}
+              style={{ display:'block', padding:'14px 0', fontSize:16, color:'#0A0A0A', textDecoration:'none', borderBottom:'1px solid rgba(0,0,0,0.07)' }}>
+              {item.label}
+            </a>
+          ))}
+          <div style={{ marginTop:16, display:'flex', flexDirection:'column', gap:10 }}>
+            {loggedIn ? (
+              <Link href="/dashboard/marketplace" className="btn-main" onClick={() => setNavOpen(false)}>My SpareShare →</Link>
+            ) : (
+              <>
+                <Link href="/register" className="btn-main" onClick={() => setNavOpen(false)}>Get started</Link>
+                <Link href="/login" className="btn-ghost" onClick={() => setNavOpen(false)}>Log in</Link>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* HERO */}
-      <section style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '120px 48px 80px', position: 'relative', overflow: 'hidden' }}>
+      <section style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: isMobile ? '100px 20px 60px' : '120px 48px 80px', position: 'relative', overflow: 'hidden' }}>
         {/* Background grid */}
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px)', backgroundSize: '48px 48px', pointerEvents: 'none' }} />
         {/* Accent circle */}
@@ -118,7 +161,7 @@ export default function LandingPage() {
           </div>
 
           {/* Stats row */}
-          <div className="anim-4" style={{ display: 'flex', gap: 40, marginTop: 64, paddingTop: 40, borderTop: '1px solid rgba(0,0,0,0.1)' }}>
+          <div className="anim-4" style={{ display: 'flex', gap: isMobile ? 24 : 40, marginTop: isMobile ? 48 : 64, flexWrap:'wrap', paddingTop: 40, borderTop: '1px solid rgba(0,0,0,0.1)' }}>
             {[
               { n: '97,000+', l: 'Verified PNs' },
               { n: '100%', l: 'Trade Assurance-secured' },
@@ -134,13 +177,13 @@ export default function LandingPage() {
       </section>
 
       {/* HOW IT WORKS */}
-      <section style={{ padding: '100px 48px', background: '#0A0A0A', color: '#F7F6F2' }}>
+      <section style={{ padding: isMobile ? '60px 20px' : '100px 48px', background: '#0A0A0A', color: '#F7F6F2' }}>
         <div style={{ maxWidth: 960, margin: '0 auto' }}>
           <span className="tag" style={{ background: '#1E1E1E', color: '#8A8070' }}>How it works</span>
           <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 'clamp(32px, 4vw, 52px)', fontWeight: 400, letterSpacing: '-0.03em', marginTop: 20, marginBottom: 60, lineHeight: 1.1 }}>
             From listing to delivery<br /><em style={{ color: '#7DB896' }}>fully protected.</em>
           </h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1, background: '#1E1E1E', borderRadius: 16, overflow: 'hidden' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 1, background: '#1E1E1E', borderRadius: 16, overflow: 'hidden' }}>
             {[
               { n: '01', t: 'List or search', d: 'Post inventory or browse 97k+ verified PNs across all major telecom brands.' },
               { n: '02', t: 'Match & offer', d: 'AI matches your buy intent to available stock. Send or receive offers directly.' },
@@ -158,7 +201,7 @@ export default function LandingPage() {
       </section>
 
       {/* TRADE ASSURANCE */}
-      <section style={{ padding: '100px 48px', background: '#F7F6F2' }}>
+      <section style={{ padding: isMobile ? '60px 20px' : '100px 48px', background: '#F7F6F2' }}>
         <div style={{ maxWidth: 960, margin: '0 auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 48, alignItems: 'center' }}>
             <div>
@@ -214,7 +257,7 @@ export default function LandingPage() {
       </section>
 
       {/* AI FEATURES */}
-      <section style={{ padding: '100px 48px', background: '#EDEBE3' }}>
+      <section style={{ padding: isMobile ? '60px 20px' : '100px 48px', background: '#EDEBE3' }}>
         <div style={{ maxWidth: 960, margin: '0 auto' }}>
           <span className="tag">AI-powered</span>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 48, marginTop: 24, alignItems: 'start' }}>
@@ -262,13 +305,13 @@ export default function LandingPage() {
       </section>
 
       {/* TESTIMONIALS */}
-      <section style={{ padding: '100px 48px', background: '#F7F6F2' }}>
+      <section style={{ padding: isMobile ? '60px 20px' : '100px 48px', background: '#F7F6F2' }}>
         <div style={{ maxWidth: 960, margin: '0 auto' }}>
           <span className="tag">From our users</span>
           <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 'clamp(28px, 3.5vw, 44px)', fontWeight: 400, letterSpacing: '-0.03em', marginTop: 20, marginBottom: 48, lineHeight: 1.1 }}>
             Trusted by telecom<br /><em style={{ color: '#3D7A5C' }}>professionals.</em>
           </h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 16 }}>
             {[
               { q: "We cleared €180k of aging Nokia inventory in three weeks. The part number matching saved us days of manual cross-referencing.", name: 'Mehmet K.', co: 'Türk Telekom' },
               { q: "Trade Assurance gave our finance team the confidence to approve international deals. No more wire transfer anxiety.", name: 'Sara B.', co: 'Nordic Teleparts' },
@@ -293,7 +336,7 @@ export default function LandingPage() {
       </section>
 
       {/* CTA */}
-      <section style={{ padding: '100px 48px', background: '#3D7A5C', color: 'white', textAlign: 'center' }}>
+      <section style={{ padding: isMobile ? '60px 20px' : '100px 48px', background: '#3D7A5C', color: 'white', textAlign: 'center' }}>
         <span className="tag" style={{ background: 'rgba(255,255,255,0.15)', color: 'white' }}>Get started today</span>
         <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 'clamp(32px, 5vw, 64px)', fontWeight: 400, letterSpacing: '-0.03em', marginTop: 20, marginBottom: 20, lineHeight: 1.1 }}>
           Ready to trade smarter?
@@ -320,7 +363,7 @@ export default function LandingPage() {
       </section>
 
       {/* FOOTER */}
-      <footer style={{ padding: '40px 48px', background: '#0A0A0A', color: '#6A6A6A', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+      <footer style={{ padding: isMobile ? '28px 20px' : '40px 48px', background: '#0A0A0A', color: '#6A6A6A', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Logo size={16} linkTo="/" dark={true} />
           <span style={{ fontSize: 11, color: '#3A3A3A' }}>· B2B Exchange with Trade Assurance</span>
