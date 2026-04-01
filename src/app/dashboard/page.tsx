@@ -9,7 +9,7 @@ type RecentTx = { id: string; type: 'buy' | 'sell'; status: string; pn: string; 
 const QUICK_ACTIONS = [
   { icon: '🌐', label: 'Search Marketplace', desc: 'Find parts from other companies', href: '/dashboard/marketplace' },
   { icon: '📦', label: 'Add Listing',         desc: 'List parts you want to sell',    href: '/dashboard/add-listing' },
-  { icon: '🛒', label: 'New Buy Intent',       desc: 'Post what you\'re looking for',  href: '/dashboard/buy-intents' },
+  { icon: '🛒', label: 'New Buy Intent',       desc: 'Post what you\'re looking for',  href: '/dashboard/buy-inquiries' },
   { icon: '📥', label: 'CSV Import',           desc: 'Bulk upload your inventory',    href: '/dashboard/csv-import' },
   { icon: '📊', label: 'Analytics',            desc: 'View market intelligence',      href: '/dashboard/analytics' },
   { icon: '💬', label: 'Messages',             desc: 'Communicate anonymously',       href: '/dashboard/messages' },
@@ -111,7 +111,7 @@ export default function DashboardPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12, marginBottom: 36 }}>
           {[
             { label: 'Active Listings', value: stats.listings,     icon: '📦', href: '/dashboard/listings',     color: '#1e40af', bg: '#eff6ff' },
-            { label: 'Buy Intents',     value: stats.buyIntents,   icon: '🛒', href: '/dashboard/buy-intents',  color: '#15803d', bg: '#f0fdf4' },
+            { label: 'Buy Intents',     value: stats.buyIntents,   icon: '🛒', href: '/dashboard/buy-inquiries',  color: '#15803d', bg: '#f0fdf4' },
             { label: 'Unread Messages', value: stats.messages,     icon: '💬', href: '/dashboard/messages',     color: stats.messages > 0 ? '#dc2626' : '#64748b', bg: stats.messages > 0 ? '#fef2f2' : '#f8fafc' },
             { label: 'Transactions',    value: stats.transactions, icon: '🔄', href: '/dashboard/transactions', color: '#6d28d9', bg: '#f5f3ff' },
           ].map(s => (

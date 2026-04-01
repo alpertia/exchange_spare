@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase"
 const navItems = [
   { label: "Marketplace",        href: "/dashboard/marketplace" },
   { label: "My SELL Listings",   href: "/dashboard/selling" },
-  { label: "My BUY Intents",     href: "/dashboard/buy-intents" },
+  { label: "My BUY Intents",     href: "/dashboard/buy-inquiries" },
   { label: "My CART",            href: "/dashboard/buying" },
   { label: "My Messages",        href: "/dashboard/messages" },
   { label: "My Transactions",    href: "/dashboard/transactions" },
@@ -232,7 +232,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 item.href === "/dashboard/messages"     ? unreadMsgs :
                 item.href === "/dashboard/transactions" ? txBadge :
                 item.href === "/dashboard/selling"      ? sellBadge :
-                item.href === "/dashboard/buy-intents"  ? buyBadge :
+                item.href === "/dashboard/buy-inquiries"  ? buyBadge :
                 undefined
               }
               badgeColor={
