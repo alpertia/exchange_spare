@@ -64,7 +64,7 @@ export default function ResetPasswordPage() {
       }}>
         <div style={{ marginBottom: "8px" }}>
           <h2 style={{ fontSize: "22px", fontWeight: "bold", margin: 0 }}>Set New Password</h2>
-          <p style={{ color: "#64748b", fontSize: "13px", margin: "6px 0 0" }}>SpareShare B2B Exchange</p>
+          <p style={{ color: "#64748b", fontSize: "13px", margin: "6px 0 0" }}>ExchangeSpare B2B Exchange</p>
         </div>
 
         {success ? (

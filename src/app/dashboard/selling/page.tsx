@@ -416,7 +416,7 @@ export default function SellingPage() {
     const csv = [headers.join(','), example.join(',')].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url; a.download = 'spareshare_import_template.csv'; a.click()
+    const a = document.createElement('a'); a.href = url; a.download = 'exchangespare_import_template.csv'; a.click()
     URL.revokeObjectURL(url)
   }
 
@@ -436,7 +436,7 @@ export default function SellingPage() {
     const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${v}"`).join(','))].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url; a.download = `spareshare_listings_${new Date().toISOString().slice(0,10)}.csv`; a.click()
+    const a = document.createElement('a'); a.href = url; a.download = `exchangespare_listings_${new Date().toISOString().slice(0,10)}.csv`; a.click()
     URL.revokeObjectURL(url)
   }
 

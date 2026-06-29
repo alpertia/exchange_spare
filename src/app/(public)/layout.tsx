@@ -67,7 +67,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
           {!checked ? (
             <div style={{ width: 120, height: 36 }} />
           ) : loggedIn ? (
-            <Link href="/dashboard/marketplace" className="btn-main" style={{ padding: '9px 20px', fontSize: 13 }}>My SpareShare →</Link>
+            <Link href="/dashboard/marketplace" className="btn-main" style={{ padding: '9px 20px', fontSize: 13 }}>My ExchangeSpare →</Link>
           ) : (
             <>
               <Link href="/login" className="btn-ghost" style={{ padding: '9px 20px', fontSize: 13 }}>Log in</Link>
@@ -87,7 +87,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
         <div style={{ display: 'flex', gap: 24, fontSize: 12, color: '#6A6A6A' }}>
           {['Trade Assurance', 'Privacy', 'Terms', 'Contact'].map(l => <span key={l} style={{ cursor: 'pointer' }}>{l}</span>)}
         </div>
-        <div style={{ fontSize: 12, color: '#6A6A6A' }}>© 2026 SpareShare</div>
+        <div style={{ fontSize: 12, color: '#6A6A6A' }}>© 2026 ExchangeSpare</div>
       </footer>
     </div>
   )

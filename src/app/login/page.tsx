@@ -71,7 +71,7 @@ export default function LoginPage() {
             {forgotMode ? "Reset Password" : "Login"}
           </h2>
           <p style={{ color: "#64748b", fontSize: "13px", margin: "6px 0 0" }}>
-            SpareShare B2B Exchange
+            ExchangeSpare B2B Exchange
           </p>
         </div>
 

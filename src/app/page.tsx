@@ -87,7 +87,7 @@ export default function LandingPage() {
         )}
         <div className="nav-buttons" style={{ display: 'flex', gap: 10 }}>
           {loggedIn ? (
-            <Link href="/dashboard/marketplace" className="btn-main" style={{ padding: '10px 20px', fontSize: 13 }}>My SpareShare →</Link>
+            <Link href="/dashboard/marketplace" className="btn-main" style={{ padding: '10px 20px', fontSize: 13 }}>My ExchangeSpare →</Link>
           ) : (
             <>
               <Link href="/login" className="btn-ghost" style={{ padding: '10px 20px', fontSize: 13 }}>Log in</Link>
@@ -118,7 +118,7 @@ export default function LandingPage() {
           ))}
           <div style={{ marginTop:16, display:'flex', flexDirection:'column', gap:10 }}>
             {loggedIn ? (
-              <Link href="/dashboard/marketplace" className="btn-main" onClick={() => setNavOpen(false)}>My SpareShare →</Link>
+              <Link href="/dashboard/marketplace" className="btn-main" onClick={() => setNavOpen(false)}>My ExchangeSpare →</Link>
             ) : (
               <>
                 <Link href="/register" className="btn-main" onClick={() => setNavOpen(false)}>Get started</Link>
@@ -151,7 +151,7 @@ export default function LandingPage() {
           </p>
           <div className="anim-4" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             {loggedIn ? (
-              <Link href="/dashboard/marketplace" className="btn-main">Go to My SpareShare →</Link>
+              <Link href="/dashboard/marketplace" className="btn-main">Go to My ExchangeSpare →</Link>
             ) : (
               <>
                 <Link href="/register" className="btn-main">Start trading free →</Link>
@@ -210,7 +210,7 @@ export default function LandingPage() {
                 Your money moves only<br />when the deal is done.
               </h2>
               <p style={{ fontSize: 15, color: '#5A5545', lineHeight: 1.75, marginBottom: 32 }}>
-                SpareShare holds funds in Trade Assurance until the buyer confirms delivery. No wire risk, no unresolved disputes — every transaction is backed by our protection policy.
+                ExchangeSpare holds funds in Trade Assurance until the buyer confirms delivery. No wire risk, no unresolved disputes — every transaction is backed by our protection policy.
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                 {[
@@ -347,7 +347,7 @@ export default function LandingPage() {
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
           {loggedIn ? (
             <Link href="/dashboard/marketplace" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'white', color: '#3D7A5C', padding: '14px 32px', borderRadius: 100, fontSize: 15, fontWeight: 500, textDecoration: 'none' }}>
-              Go to My SpareShare →
+              Go to My ExchangeSpare →
             </Link>
           ) : (
             <>
@@ -382,7 +382,7 @@ export default function LandingPage() {
             </a>
           ))}
         </div>
-        <div style={{ fontSize: 12 }}>© 2026 SpareShare</div>
+        <div style={{ fontSize: 12 }}>© 2026 ExchangeSpare</div>
       </footer>
     </div>
   )

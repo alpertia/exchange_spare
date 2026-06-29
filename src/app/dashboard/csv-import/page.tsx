@@ -226,7 +226,7 @@ export default function CSVImportPage() {
     <div style={{ maxWidth: 700 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <h1 style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', margin: 0 }}>Import Listings</h1>
-        <button onClick={() => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([SAMPLE], { type: 'text/csv' })); a.download = 'spareshare_template.csv'; a.click() }}
+        <button onClick={() => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([SAMPLE], { type: 'text/csv' })); a.download = 'exchangespare_template.csv'; a.click() }}
           style={{ padding: '7px 14px', background: 'transparent', color: '#1e40af', border: '1px solid #bfdbfe', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>
           ↓ Template CSV
         </button>

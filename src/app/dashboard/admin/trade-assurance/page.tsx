@@ -147,7 +147,7 @@ export default function TradeAssurancePage() {
     <div>
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: '0 0 4px', letterSpacing: '-0.03em' }}>🛡️ Trade Assurance Account</h1>
-        <div style={{ fontSize: 13, color: '#94a3b8' }}>Secure global trading — protected by SpareShare Trade Assurance</div>
+        <div style={{ fontSize: 13, color: '#94a3b8' }}>Secure global trading — protected by ExchangeSpare Trade Assurance</div>
       </div>
 
       {/* Balance cards */}

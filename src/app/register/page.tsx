@@ -73,7 +73,7 @@ export default function RegisterPage() {
     <div style={{ minHeight: '100vh', background: '#0b1120', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ width: '100%', maxWidth: '440px', padding: '40px', background: '#1e293b', borderRadius: '16px', border: '1px solid #334155' }}>
         <h1 style={{ color: 'white', fontSize: '22px', fontWeight: 'bold', marginBottom: '6px' }}>Create Account</h1>
-        <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '28px' }}>SpareShare B2B Exchange</p>
+        <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '28px' }}>ExchangeSpare B2B Exchange</p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <div>

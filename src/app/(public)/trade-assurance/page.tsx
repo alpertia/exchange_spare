@@ -10,7 +10,7 @@ export default function TradeAssurancePage() {
           Your money moves only<br /><em style={{ fontStyle:'italic', color:'#3D7A5C' }}>when the deal is done.</em>
         </h1>
         <p className="a3" style={{ fontSize:17, color:'#5A5545', lineHeight:1.75, maxWidth:520, margin:'0 auto 40px' }}>
-          SpareShare holds buyer funds in a secure trade assurance account until delivery is confirmed. No wire transfer risk. No unresolved disputes. Every transaction is protected.
+          ExchangeSpare holds buyer funds in a secure trade assurance account until delivery is confirmed. No wire transfer risk. No unresolved disputes. Every transaction is protected.
         </p>
         <div className="a3" style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap' }}>
           <Link href="/register" className="btn-main">Open a free account →</Link>
@@ -48,7 +48,7 @@ export default function TradeAssurancePage() {
             Deposit by card or bank transfer.
           </h2>
           <p style={{ fontSize:15, color:'#5A5545', marginBottom:40, lineHeight:1.7, maxWidth:560 }}>
-            Your Trade Assurance account accepts deposits via credit card (Visa, Mastercard) or international bank wire. Funds are held in a segregated Trade Assurance account — never commingled with SpareShare operating funds.
+            Your Trade Assurance account accepts deposits via credit card (Visa, Mastercard) or international bank wire. Funds are held in a segregated Trade Assurance account — never commingled with ExchangeSpare operating funds.
           </p>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:16 }}>
             {[
@@ -120,7 +120,7 @@ export default function TradeAssurancePage() {
       <section style={{ padding:'80px 48px', background:'#3D7A5C', textAlign:'center' }}>
         <span className="tag" style={{ background:'rgba(255,255,255,0.15)', color:'white' }}>Get protected today</span>
         <h2 style={{ fontFamily:"'DM Serif Display', serif", fontSize:'clamp(28px, 4vw, 52px)', fontWeight:400, letterSpacing:'-0.03em', color:'white', marginTop:20, marginBottom:16, lineHeight:1.1 }}>Start trading with confidence.</h2>
-        <p style={{ fontSize:15, color:'rgba(255,255,255,0.75)', marginBottom:36, maxWidth:440, margin:'0 auto 36px', lineHeight:1.7 }}>Every transaction on SpareShare is protected by Trade Assurance. Register free in 5 minutes.</p>
+        <p style={{ fontSize:15, color:'rgba(255,255,255,0.75)', marginBottom:36, maxWidth:440, margin:'0 auto 36px', lineHeight:1.7 }}>Every transaction on ExchangeSpare is protected by Trade Assurance. Register free in 5 minutes.</p>
         <div style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap' }}>
           <Link href="/register" style={{ display:'inline-flex', alignItems:'center', gap:8, background:'white', color:'#3D7A5C', padding:'13px 28px', borderRadius:100, fontSize:14, fontWeight:500, textDecoration:'none' }}>Create free account →</Link>
           <Link href="/login" style={{ display:'inline-flex', alignItems:'center', gap:8, background:'transparent', color:'white', border:'1.5px solid rgba(255,255,255,0.4)', padding:'13px 28px', borderRadius:100, fontSize:14, textDecoration:'none' }}>Go to my account</Link>

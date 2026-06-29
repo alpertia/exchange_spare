@@ -72,7 +72,7 @@ export default function ConsultantsPage() {
       <section style={{ padding:'80px 48px', background:'#F7F6F2' }}>
         <div style={{ maxWidth:960, margin:'0 auto', display:'grid', gridTemplateColumns:'1fr 1fr', gap:48, alignItems:'center' }}>
           <div>
-            <span className="tag">Why SpareShare consultants</span>
+            <span className="tag">Why ExchangeSpare consultants</span>
             <h2 style={{ fontFamily:"'DM Serif Display', serif", fontSize:'clamp(24px, 3vw, 38px)', fontWeight:400, letterSpacing:'-0.03em', marginTop:20, marginBottom:20, lineHeight:1.15 }}>
               Deep expertise.<br /><em style={{ color:'#BA7517' }}>Real results.</em>
             </h2>
@@ -173,7 +173,7 @@ export default function ConsultantsPage() {
           Start on the platform first.
         </h2>
         <p style={{ fontSize:15, color:'rgba(255,255,255,0.75)', marginBottom:36, maxWidth:400, margin:'0 auto 36px', lineHeight:1.7 }}>
-          Many sourcing challenges are solved directly on SpareShare. Register free and search 97,000+ parts before engaging a consultant.
+          Many sourcing challenges are solved directly on ExchangeSpare. Register free and search 97,000+ parts before engaging a consultant.
         </p>
         <div style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap' }}>
           <Link href="/register" style={{ display:'inline-flex', alignItems:'center', gap:8, background:'white', color:'#BA7517', padding:'13px 28px', borderRadius:100, fontSize:14, fontWeight:500, textDecoration:'none' }}>Create free account →</Link>

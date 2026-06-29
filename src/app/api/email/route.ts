@@ -3,7 +3,7 @@ import { Resend } from 'resend'
 import { createClient } from '@supabase/supabase-js'
 
 const getResend = () => new Resend(process.env.RESEND_API_KEY!)
-const FROM = process.env.EMAIL_FROM ?? 'SpareShare <noreply@mail.ant-soft.uk>'
+const FROM = process.env.EMAIL_FROM ?? 'ExchangeSpare <noreply@mail.ant-soft.uk>'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -53,7 +53,7 @@ function baseClose() {
   return `
       </div>
       <div style="padding: 16px 28px; text-align: center; font-size: 11px; color: #94a3b8;">
-        SpareShare B2B Marketplace · Trade Assurance Service<br/>
+        ExchangeSpare B2B Marketplace · Trade Assurance Service<br/>
         This is an automated message — please do not reply directly.
       </div>
     </div>
@@ -196,7 +196,7 @@ const templates: Record<string, (d: any) => { subject: string; html: string }> =
     subject: `📋 Consultant Inquiry — ${d.topic || 'General'} · ${d.name}`,
     html: baseStyle() + `
       <h2 style="margin: 0 0 8px; font-size: 18px; color: #0f172a;">New Consultant Inquiry</h2>
-      <p style="color: #64748b; font-size: 13px; margin: 0 0 20px;">A visitor has submitted a consultant inquiry from the SpareShare website.</p>
+      <p style="color: #64748b; font-size: 13px; margin: 0 0 20px;">A visitor has submitted a consultant inquiry from the ExchangeSpare website.</p>
       <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px;">
         <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
           <tr><td style="padding: 6px 0; color: #64748b; width: 120px;">Name</td><td style="color: #0f172a; font-weight: 600;">${d.name}</td></tr>
@@ -219,7 +219,7 @@ const templates: Record<string, (d: any) => { subject: string; html: string }> =
     subject: `💬 New message from Dealer ${d.sender_code}`,
     html: baseStyle() + `
       <h2 style="margin: 0 0 8px; font-size: 18px; color: #0f172a;">New Message</h2>
-      <p style="color: #64748b; font-size: 13px; margin: 0 0 20px;">You have a new message from <strong>Dealer ${d.sender_code}</strong> on SpareShare.</p>
+      <p style="color: #64748b; font-size: 13px; margin: 0 0 20px;">You have a new message from <strong>Dealer ${d.sender_code}</strong> on ExchangeSpare.</p>
       <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; font-size: 14px; color: #0f172a; line-height: 1.6;">
         ${d.preview}
       </div>
@@ -231,9 +231,9 @@ const templates: Record<string, (d: any) => { subject: string; html: string }> =
   }),
 
   welcome: (d) => ({
-    subject: `👋 Welcome to SpareShare — ${d.company_name}`,
+    subject: `👋 Welcome to ExchangeSpare — ${d.company_name}`,
     html: baseStyle() + `
-      <h2 style="margin: 0 0 8px; font-size: 18px; color: #0f172a;">Welcome to SpareShare 👋</h2>
+      <h2 style="margin: 0 0 8px; font-size: 18px; color: #0f172a;">Welcome to ExchangeSpare 👋</h2>
       <p style="color: #64748b; font-size: 13px; margin: 0 0 20px;">Your account has been created. You can now access the B2B telecom marketplace.</p>
       <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/login"
          style="display: inline-block; padding: 10px 20px; background: #0f172a; color: white; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 700;">
@@ -251,7 +251,7 @@ const templates: Record<string, (d: any) => { subject: string; html: string }> =
         <div style="font-size: 28px; font-weight: 900; color: #185FA5;">+10 Credits</div>
         <div style="font-size: 12px; color: #64748b; margin-top: 4px;">$${d.amount} charged · Credits never expire</div>
       </div>
-      <p style="font-size: 12px; color: #64748b;">Use your credits for AI-powered product Q&amp;A, part number matching, and compatibility analysis across the SpareShare Knowledge Base.</p>
+      <p style="font-size: 12px; color: #64748b;">Use your credits for AI-powered product Q&amp;A, part number matching, and compatibility analysis across the ExchangeSpare Knowledge Base.</p>
     ` + baseClose(),
   }),
 }
