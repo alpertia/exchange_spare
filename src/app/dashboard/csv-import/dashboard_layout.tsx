@@ -196,7 +196,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div style={{ padding: "24px 20px 16px", borderBottom: "1px solid #e2e8f0" }}>
 <Link href="/" style={{ textDecoration: "none", display: "block" }}>
   <div style={{ fontSize: 22, letterSpacing: "-0.02em", lineHeight: 1, fontFamily: "'DM Serif Display', serif" }}>
-    <span style={{ color: "#0f172a" }}>Spare</span><span style={{ color: "#185FA5" }}>Share</span>
+    <span style={{ color: "#0f172a" }}>Exchange</span><span style={{ color: "#185FA5" }}>Spare</span>
   </div>
   <div style={{ fontSize: 9, fontWeight: 600, color: "#15803d", letterSpacing: "0.06em", marginTop: 4, textTransform: "lowercase" }}>with Trade Assurance</div>
 </Link>

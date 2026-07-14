@@ -19,8 +19,8 @@ export default function Logo({ size = 18, linkTo = '/', dark = false, showMotto 
         lineHeight: 1,
         display: 'inline-block',
       }}>
-        <span style={{ color: dark ? '#F7F6F2' : '#0A0A0A' }}>Spare</span>
-        <span style={{ color: '#185FA5' }}>Share</span>
+        <span style={{ color: dark ? '#F7F6F2' : '#0A0A0A' }}>Exchange</span>
+        <span style={{ color: '#185FA5' }}>Spare</span>
       </span>
       {showMotto && (
         <span style={{
