@@ -70,6 +70,8 @@ export default function KBDetailPage() {
   const [loading, setLoading]       = useState(true)
   const [tab, setTab]               = useState<'info' | 'market' | 'ai'>('info')
   const [imgIdx, setImgIdx]         = useState(0)
+  const [isAdmin, setIsAdmin]       = useState(false)
+  const [imgUploading, setImgUploading] = useState(false)
 
   // Market data
   const [soldTxs, setSoldTxs]       = useState<MarketTx[]>([])
@@ -84,17 +86,75 @@ export default function KBDetailPage() {
   const [credits, setCredits]       = useState<number | null>(null)
   const [companyId, setCompanyId]   = useState<string | null>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
+  const productImgInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { if (id) loadProduct() }, [id])
   useEffect(() => { getSession() }, [])
   useEffect(() => { if (tab === 'market' && product) loadMarket() }, [tab, product])
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
+  async function uploadToS3(file: File): Promise<string | null> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return null
+      const res = await fetch('/api/media/presign', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size,
+          listingId: `product-${id}`,
+        }),
+      })
+      if (!res.ok) return null
+      const { presignedUrl, publicUrl } = await res.json()
+      const uploadRes = await fetch(presignedUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type },
+        body: file,
+      })
+      if (!uploadRes.ok) return null
+      return publicUrl
+    } catch {
+      return null
+    }
+  }
+
+  async function addProductImage(file: File) {
+    if (!product) return
+    setImgUploading(true)
+    const url = await uploadToS3(file)
+    if (url) {
+      const newImages = [...(product.images || []), url]
+      const { error } = await supabase.from('products').update({ images: newImages }).eq('id', product.id)
+      if (!error) {
+        setProduct({ ...product, images: newImages })
+        setImgIdx(newImages.length - 1)
+      }
+    }
+    setImgUploading(false)
+  }
+
+  async function removeProductImage(index: number) {
+    if (!product) return
+    const newImages = (product.images || []).filter((_, i) => i !== index)
+    const { error } = await supabase.from('products').update({ images: newImages }).eq('id', product.id)
+    if (!error) {
+      setProduct({ ...product, images: newImages })
+      setImgIdx(0)
+    }
+  }
+
   async function getSession() {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) return
     const { data: profile } = await supabase
-      .from('profiles').select('company_id').eq('id', session.user.id).single()
+      .from('profiles').select('company_id, role').eq('id', session.user.id).single()
+    if (profile?.role === 'admin') setIsAdmin(true)
     if (profile?.company_id) {
       setCompanyId(profile.company_id)
       const { data: ai } = await supabase
@@ -231,21 +291,39 @@ Answer concisely and technically. If you don't know something specific, say so.`
       <div style={{ display: 'flex', gap: 24, marginBottom: 28, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         {/* Image */}
         <div style={{ width: 160, flexShrink: 0 }}>
-          <div style={{ width: 160, height: 130, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: 6 }}>
+          <div style={{ width: 160, height: 130, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: 6, position: 'relative' }}>
             {images.length > 0 ? (
               <img src={images[imgIdx]} alt={product.normalized_pn} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
             ) : (
               <div style={{ fontSize: 40, opacity: 0.15 }}>📦</div>
             )}
+            {isAdmin && images.length > 0 && (
+              <button onClick={() => removeProductImage(imgIdx)}
+                style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: 20, height: 20, cursor: 'pointer', fontSize: 10 }}>✕</button>
+            )}
           </div>
           {images.length > 1 && (
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: isAdmin ? 6 : 0 }}>
               {images.map((img, i) => (
                 <div key={i} onClick={() => setImgIdx(i)} style={{ width: 32, height: 28, border: `2px solid ${imgIdx === i ? '#185FA5' : '#e2e8f0'}`, borderRadius: 5, overflow: 'hidden', cursor: 'pointer' }}>
                   <img src={img} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                 </div>
               ))}
             </div>
+          )}
+          {isAdmin && (
+            <>
+              <button onClick={() => productImgInputRef.current?.click()} disabled={imgUploading}
+                style={{ width: '100%', padding: '6px', background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: 6, cursor: imgUploading ? 'not-allowed' : 'pointer', fontSize: 11, color: '#64748b' }}>
+                {imgUploading ? 'Uploading...' : '+ Add Photo'}
+              </button>
+              <input ref={productImgInputRef} type="file" accept="image/*" style={{ display: 'none' }}
+                onChange={e => {
+                  const f = e.target.files?.[0]
+                  if (f) addProductImage(f)
+                  e.target.value = ''
+                }} />
+            </>
           )}
         </div>
 

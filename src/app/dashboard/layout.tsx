@@ -24,7 +24,7 @@ const adminNavItems = [
   { label: "💬 Messages",        href: "/dashboard/admin/messages" },
   { label: "🛡️ Trade Assurance", href: "/dashboard/admin/trade-assurance" },
   { label: "📄 Deposits",        href: "/dashboard/admin/deposits" },
-  { label: "Kullanicilar",   href: "/dashboard/admin/users" },
+  { label: "Users",   href: "/dashboard/admin/users" },
 ]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
