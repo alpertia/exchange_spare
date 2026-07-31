@@ -28,12 +28,12 @@ export default function Logo({ size = 18, linkTo = '/', dark = false, showMotto 
           fontSize: size * 0.38,
           fontWeight: 400,
           fontStyle: 'italic',
-          color: '#15803d',
+          color: '#6B7280',
           letterSpacing: '0.01em',
           lineHeight: 1,
           whiteSpace: 'nowrap',
         }}>
-          Learn &amp; Sell &amp; Buy in Confidence
+          Where used meets useful.
         </span>
       )}
     </span>
