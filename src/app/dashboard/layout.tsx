@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase"
 import Logo from "@/components/Logo"
 
 const navItems = [
+  { label: "Dashboard", href: "/dashboard" },
   { label: "Marketplace",             href: "/dashboard/marketplace" },
   { label: "My Stock",   href: "/dashboard/selling" },
   { label: "My Inquiries",            href: "/dashboard/buy-inquiries" },
@@ -181,7 +182,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   const NavLink = ({ href, label, badge, badgeColor }: { href: string; label: string; badge?: number; badgeColor?: string }) => {
-    const isActive = pathname?.startsWith(href)
+    const isActive = href === "/dashboard" ? pathname === "/dashboard" : pathname?.startsWith(href)
     return (
       <Link href={href} style={{
         display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -219,7 +220,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Mobile top bar */}
       <div style={{ display: "none" }} className="mobile-topbar">
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, height: 52, background: "#EEEBE3", borderBottom: "1px solid rgba(0,0,0,0.08)", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 16px", zIndex: 1000 }}>
-          <Logo size={24} linkTo="/" />
+          <Logo size={24} linkTo="/dashboard" />
           <button onClick={() => setMobileMenuOpen(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "#0A0A0A" }}>{mobileMenuOpen ? "✕" : "☰"}</button>
         </div>
       </div>
@@ -229,7 +230,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Logo */}
         <div style={{ padding: "20px 16px 14px", borderBottom: "1px solid rgba(0,0,0,0.08)" }}>
-          <Logo size={28} linkTo="/" />
+          <Logo size={28} linkTo="/dashboard" />
         </div>
 
         {/* Company + user */}

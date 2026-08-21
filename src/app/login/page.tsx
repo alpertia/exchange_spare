@@ -120,7 +120,7 @@ export default function LoginPage() {
 
             {!forgotMode && (
               <div>
-                <label style={{ color: "#94a3b8", fontSize: "13px", display: "block", marginBottom: "6px" }}>Şifre</label>
+                <label style={{ color: "#94a3b8", fontSize: "13px", display: "block", marginBottom: "6px" }}>Password</label>
                 <input
                   type="password"
                   placeholder="••••••••"
@@ -177,7 +177,7 @@ export default function LoginPage() {
                 href="/register"
                 style={{ color: "#64748b", fontSize: "13px", textDecoration: "none" }}
               >
-                Hesabın yok mu? <span style={{ color: "#60a5fa" }}>Kayıt ol</span>
+                No account yet? <span style={{ color: "#60a5fa" }}>Sign up</span>
               </a>
               <button
                 onClick={() => { setForgotMode(!forgotMode); setError("") }}
