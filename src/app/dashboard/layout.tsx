@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import Logo from "@/components/Logo"
+import AssistantPanel from "@/components/AssistantPanel"
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard" },
@@ -46,6 +47,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [aiCredits, setAiCredits]             = useState<number | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [assistantOpen, setAssistantOpen] = useState(false)
 
   useEffect(() => { init() }, [])
 
@@ -259,7 +261,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* AI Credits */}
         {aiCredits !== null && (
-          <Link href="/dashboard/settings" style={{ display: "block", padding: "10px 16px", background: aiCredits === 0 ? "#fef2f2" : "#EAE7DF", borderBottom: "1px solid rgba(0,0,0,0.08)", textDecoration: "none" }}>
+          <div onClick={() => setAssistantOpen(true)} style={{ display: "block", padding: "10px 16px", background: aiCredits === 0 ? "#fef2f2" : "#EAE7DF", borderBottom: "1px solid rgba(0,0,0,0.08)", cursor: "pointer" }}>
             <div style={{ fontSize: 9, fontWeight: 700, color: aiCredits === 0 ? "#dc2626" : "#5A5545", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 3 }}>🤖 AI Queries</div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
               <span style={{ fontSize: 18, fontWeight: 700, color: aiCredits === 0 ? "#dc2626" : "#0A0A0A", fontFamily: "'DM Mono', monospace" }}>{aiCredits}</span>
@@ -268,7 +270,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {aiCredits === 0 && (
               <div style={{ fontSize: 10, color: "#dc2626", marginTop: 2, fontWeight: 600 }}>⚠ No credits left</div>
             )}
-          </Link>
+          </div>
         )}
 
         {/* Nav */}
@@ -314,6 +316,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {children}
         </div>
       </div>
+
+      <AssistantPanel open={assistantOpen} onClose={() => setAssistantOpen(false)} companyId={myCompanyId} />
     </div>
   )
 }
