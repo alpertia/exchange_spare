@@ -6,7 +6,6 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-// ── Tool definitions ──────────────────────────────────────────────────────────
 const TOOLS = [
   {
     name: 'search_products',
@@ -57,10 +56,19 @@ const TOOLS = [
       required: [],
     },
   },
+  {
+    name: 'check_demand_signal',
+    description: 'Check how much cross-platform interest a part number has received recently — how many distinct companies (anonymised, no identities revealed) searched for it in the last 7 and 30 days. Use this when the user asks things like "is anyone else looking for this", "is this popular", or "has this been searched before".',
+    input_schema: {
+      type: 'object',
+      properties: {
+        pn: { type: 'string', description: 'The part number to check demand for' },
+      },
+      required: ['pn'],
+    },
+  },
 ]
 
-// ── Tool execution ────────────────────────────────────────────────────────────
-// Resolve PN alias → canonical PN
 async function resolvePN(pn: string): Promise<string> {
   const normalized = pn.toUpperCase().replace(/[^A-Z0-9]/g, '')
   const { data } = await supabaseAdmin
@@ -72,11 +80,24 @@ async function resolvePN(pn: string): Promise<string> {
   return data?.canonical_pn || pn
 }
 
-async function executeTool(name: string, input: any): Promise<string> {
+async function logSearch(companyId: string | undefined, pn: string) {
+  if (!pn) return
+  try {
+    await supabaseAdmin.from('ai_search_log').insert({
+      company_id: companyId || null,
+      pn: pn.toUpperCase().replace(/[^A-Z0-9]/g, ''),
+    })
+  } catch {
+    // logging failures should never break the chat response
+  }
+}
+
+async function executeTool(name: string, input: any, companyId: string | undefined): Promise<string> {
   try {
     if (name === 'search_products') {
       const q = (input.query || '').trim()
       const limit = input.limit || 10
+      if (q) await logSearch(companyId, q)
       const { data } = await supabaseAdmin
         .from('products')
         .select('normalized_pn, brand, description, lifecycle_status, category')
@@ -91,6 +112,7 @@ async function executeTool(name: string, input: any): Promise<string> {
       let productIds: string[] = []
 
       if (input.pn) {
+        await logSearch(companyId, input.pn)
         const resolvedPN = await resolvePN(input.pn)
         const searchPN = resolvedPN !== input.pn ? resolvedPN : input.pn
         const { data: prods } = await supabaseAdmin
@@ -145,6 +167,7 @@ async function executeTool(name: string, input: any): Promise<string> {
 
     if (name === 'get_product_detail') {
       const pn = (input.normalized_pn || '').trim()
+      if (pn) await logSearch(companyId, pn)
       const { data: prodData } = await supabaseAdmin
         .from('products').select('*').eq('normalized_pn', pn).single()
       if (!prodData) return `Product "${pn}" not found in catalogue`
@@ -211,18 +234,44 @@ async function executeTool(name: string, input: any): Promise<string> {
       })), null, 2)
     }
 
+    if (name === 'check_demand_signal') {
+      const pn = (input.pn || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
+      if (!pn) return 'No part number provided'
+
+      const since7 = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+      const since30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+
+      const [{ data: last7 }, { data: last30 }] = await Promise.all([
+        supabaseAdmin.from('ai_search_log').select('company_id').eq('pn', pn).gte('created_at', since7),
+        supabaseAdmin.from('ai_search_log').select('company_id').eq('pn', pn).gte('created_at', since30),
+      ])
+
+      const distinctCompanies7 = new Set((last7 || []).map((r: any) => r.company_id).filter(Boolean)).size
+      const distinctCompanies30 = new Set((last30 || []).map((r: any) => r.company_id).filter(Boolean)).size
+
+      return JSON.stringify({
+        pn,
+        searches_last_7_days: last7?.length || 0,
+        distinct_companies_last_7_days: distinctCompanies7,
+        searches_last_30_days: last30?.length || 0,
+        distinct_companies_last_30_days: distinctCompanies30,
+        note: 'Company identities are never revealed — only aggregate anonymised counts.',
+      }, null, 2)
+    }
+
     return 'Unknown tool'
   } catch (err: any) {
     return `Tool error: ${err.message}`
   }
 }
 
-// ── Agentic loop ──────────────────────────────────────────────────────────────
 async function runWithTools(body: any): Promise<any> {
   const messages = [...(body.messages || [])]
   const system = body.system || `You are ExchangeSpare Assistant, an expert B2B electronics parts marketplace AI.
 You have live access to the ExchangeSpare platform database of 97,000+ products and active sell/buy listings.
+You also receive the recent conversation history with this company on every request — treat it as your own memory of what you've discussed with them before, and refer back to it naturally when relevant (e.g. "as I mentioned earlier", "you asked about this before"). Do not claim you have no memory of past messages in this conversation.
 When asked about product availability, ALWAYS search the database first using the provided tools.
+When asked whether other companies have shown interest in a part, use check_demand_signal — never guess, and never reveal which specific company searched, only aggregate anonymised counts.
 Be concise and precise. Format prices and quantities clearly.
 When listings are found, show: seller, quantity, price, condition, location, listing date.
 When not found, say clearly and suggest searching by different PN variations.
@@ -239,7 +288,7 @@ Respond in the same language the user is writing in.`
       toolUseBlocks.map(async (block: any) => ({
         type: 'tool_result' as const,
         tool_use_id: block.id,
-        content: await executeTool(block.name, block.input),
+        content: await executeTool(block.name, block.input, body.company_id),
       }))
     )
 
@@ -270,7 +319,6 @@ async function callClaude(body: any) {
   return res.json()
 }
 
-// ── AI Credit check ───────────────────────────────────────────────────────────
 async function checkAndConsumeCredit(
   company_id: string,
   feature: string
@@ -284,12 +332,10 @@ async function checkAndConsumeCredit(
   return { ok: true, remaining: data.remaining }
 }
 
-// ── Route handler ─────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
 
-    // Credit gate — skip only for internal/admin calls with skip_credit_check: true
     if (!body.skip_credit_check) {
       const company_id: string | undefined = body.company_id
       if (!company_id) {
@@ -299,7 +345,6 @@ export async function POST(req: NextRequest) {
         )
       }
 
-      // feature tag: ai_fill / find_pn for skipTools calls, kb_chat for agentic
       const feature = body.skipTools
         ? (body.credit_feature || 'ai_fill')
         : 'kb_chat'
@@ -312,7 +357,6 @@ export async function POST(req: NextRequest) {
         )
       }
 
-      // Run and attach remaining credits to response header
       const result = await (body.skipTools
         ? callClaude({ ...body, tools: undefined })
         : runWithTools(body))
@@ -321,7 +365,6 @@ export async function POST(req: NextRequest) {
       return response
     }
 
-    // Internal / admin calls — no credit deduction
     if (body.skipTools) {
       const data = await callClaude({ ...body, tools: undefined })
       return NextResponse.json(data)
