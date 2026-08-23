@@ -7,8 +7,8 @@ type Msg = { id: string; role: 'user' | 'assistant'; content: string }
 const BOBBLE_STYLE = `@keyframes bobble { 0%,100%{transform:translateY(0) scale(1)} 50%{transform:translateY(-3px) scale(1.03)} }`
 
 export default function AssistantPanel({
-  open, onOpen, onClose, companyId,
-}: { open: boolean; onOpen: () => void; onClose: () => void; companyId: string | null }) {
+  open, onOpen, onClose, companyId, companyName,
+}: { open: boolean; onOpen: () => void; onClose: () => void; companyId: string | null; companyName?: string | null }) {
   const [messages, setMessages] = useState<Msg[]>([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
@@ -55,6 +55,7 @@ export default function AssistantPanel({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           company_id: companyId,
+          company_name: companyName || null,
           messages: nextMessages.map(m => ({ role: m.role, content: m.content })),
         }),
       })
