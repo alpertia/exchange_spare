@@ -7,8 +7,8 @@ type Msg = { id: string; role: 'user' | 'assistant'; content: string }
 const BOBBLE_STYLE = `@keyframes bobble { 0%,100%{transform:translateY(0) scale(1)} 50%{transform:translateY(-3px) scale(1.03)} }`
 
 export default function AssistantPanel({
-  open, onClose, companyId,
-}: { open: boolean; onClose: () => void; companyId: string | null }) {
+  open, onOpen, onClose, companyId,
+}: { open: boolean; onOpen: () => void; onClose: () => void; companyId: string | null }) {
   const [messages, setMessages] = useState<Msg[]>([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
@@ -83,70 +83,85 @@ export default function AssistantPanel({
     setSending(false)
   }
 
-  if (!open) return null
-
-
   return (
     <>
-    <style>{BOBBLE_STYLE}</style>
-    <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', justifyContent: 'flex-end' }}>
-      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)' }} />
-      <div style={{ position: 'relative', width: 400, maxWidth: '100%', height: '100vh', background: 'white', display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 30px rgba(0,0,0,0.15)' }}>
+      <style>{BOBBLE_STYLE}</style>
 
-        <div style={{ padding: '16px 18px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <img src="/assistant.png" alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', animation: 'bobble 3s ease-in-out infinite' }} />
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>AI Assistant</div>
+      {!open && (
+        <button
+          onClick={onOpen}
+          aria-label="Open AI Assistant"
+          style={{
+            position: 'fixed', bottom: 24, right: 24, zIndex: 150,
+            width: 56, height: 56, borderRadius: '50%', border: 'none', padding: 0,
+            cursor: 'pointer', boxShadow: '0 6px 20px rgba(0,0,0,0.25)', overflow: 'hidden',
+            background: 'white',
+          }}
+        >
+          <img src="/assistant.png" alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', animation: 'bobble 3s ease-in-out infinite' }} />
+        </button>
+      )}
+
+      {open && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', justifyContent: 'flex-end' }}>
+          <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)' }} />
+          <div style={{ position: 'relative', width: 400, maxWidth: '100%', height: '100vh', background: 'white', display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 30px rgba(0,0,0,0.15)' }}>
+
+            <div style={{ padding: '16px 18px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <img src="/assistant.png" alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', animation: 'bobble 3s ease-in-out infinite' }} />
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>AI Assistant</div>
+                </div>
+                <div style={{ fontSize: 11, color: '#94a3b8' }}>Ask about parts, listings, or the platform</div>
+              </div>
+              <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#94a3b8' }}>✕</button>
+            </div>
+
+            <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {messages.length === 0 && loaded && (
+                <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, marginTop: 40 }}>
+                  Ask me anything — part availability, pricing, or how to use ExchangeSpare.
+                </div>
+              )}
+              {messages.map(m => (
+                <div key={m.id} style={{
+                  alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
+                  maxWidth: '85%', padding: '9px 12px', borderRadius: 10, fontSize: 13, lineHeight: 1.5,
+                  background: m.role === 'user' ? '#0f172a' : '#f1f5f9',
+                  color: m.role === 'user' ? 'white' : '#0f172a',
+                  whiteSpace: 'pre-wrap',
+                }}>
+                  {m.content}
+                </div>
+              ))}
+              {sending && (
+                <div style={{ alignSelf: 'flex-start', padding: '9px 12px', borderRadius: 10, background: '#f1f5f9', color: '#94a3b8', fontSize: 13 }}>
+                  Thinking...
+                </div>
+              )}
+            </div>
+
+            {errorMsg && (
+              <div style={{ padding: '8px 16px', background: '#fef2f2', color: '#dc2626', fontSize: 12 }}>{errorMsg}</div>
+            )}
+
+            <div style={{ padding: 12, borderTop: '1px solid #e2e8f0', display: 'flex', gap: 8 }}>
+              <input
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), send())}
+                placeholder="Type a message..."
+                style={{ flex: 1, padding: '9px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, outline: 'none' }}
+              />
+              <button onClick={send} disabled={sending || !input.trim()}
+                style={{ padding: '9px 16px', background: sending || !input.trim() ? '#94a3b8' : '#0f172a', color: 'white', border: 'none', borderRadius: 8, cursor: sending ? 'default' : 'pointer', fontSize: 13, fontWeight: 600 }}>
+                Send
+              </button>
+            </div>
           </div>
-            <div style={{ fontSize: 11, color: '#94a3b8' }}>Ask about parts, listings, or the platform</div>
-          </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#94a3b8' }}>✕</button>
         </div>
-
-        <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {messages.length === 0 && loaded && (
-            <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, marginTop: 40 }}>
-              Ask me anything — part availability, pricing, or how to use ExchangeSpare.
-            </div>
-          )}
-          {messages.map(m => (
-            <div key={m.id} style={{
-              alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
-              maxWidth: '85%', padding: '9px 12px', borderRadius: 10, fontSize: 13, lineHeight: 1.5,
-              background: m.role === 'user' ? '#0f172a' : '#f1f5f9',
-              color: m.role === 'user' ? 'white' : '#0f172a',
-              whiteSpace: 'pre-wrap',
-            }}>
-              {m.content}
-            </div>
-          ))}
-          {sending && (
-            <div style={{ alignSelf: 'flex-start', padding: '9px 12px', borderRadius: 10, background: '#f1f5f9', color: '#94a3b8', fontSize: 13 }}>
-              Thinking...
-            </div>
-          )}
-        </div>
-
-        {errorMsg && (
-          <div style={{ padding: '8px 16px', background: '#fef2f2', color: '#dc2626', fontSize: 12 }}>{errorMsg}</div>
-        )}
-
-        <div style={{ padding: 12, borderTop: '1px solid #e2e8f0', display: 'flex', gap: 8 }}>
-          <input
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), send())}
-            placeholder="Type a message..."
-            style={{ flex: 1, padding: '9px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, outline: 'none' }}
-          />
-          <button onClick={send} disabled={sending || !input.trim()}
-            style={{ padding: '9px 16px', background: sending || !input.trim() ? '#94a3b8' : '#0f172a', color: 'white', border: 'none', borderRadius: 8, cursor: sending ? 'default' : 'pointer', fontSize: 13, fontWeight: 600 }}>
-            Send
-          </button>
-        </div>
-      </div>
-    </div>
+      )}
     </>
   )
 }
