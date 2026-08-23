@@ -4,6 +4,8 @@ import { supabase } from '@/lib/supabase'
 
 type Msg = { id: string; role: 'user' | 'assistant'; content: string }
 
+const BOBBLE_STYLE = `@keyframes bobble { 0%,100%{transform:translateY(0) scale(1)} 50%{transform:translateY(-3px) scale(1.03)} }`
+
 export default function AssistantPanel({
   open, onClose, companyId,
 }: { open: boolean; onClose: () => void; companyId: string | null }) {
@@ -83,14 +85,20 @@ export default function AssistantPanel({
 
   if (!open) return null
 
+
   return (
+    <>
+    <style>{BOBBLE_STYLE}</style>
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', justifyContent: 'flex-end' }}>
       <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)' }} />
       <div style={{ position: 'relative', width: 400, maxWidth: '100%', height: '100vh', background: 'white', display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 30px rgba(0,0,0,0.15)' }}>
 
         <div style={{ padding: '16px 18px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>🤖 AI Assistant</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <img src="/assistant.png" alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', animation: 'bobble 3s ease-in-out infinite' }} />
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>AI Assistant</div>
+          </div>
             <div style={{ fontSize: 11, color: '#94a3b8' }}>Ask about parts, listings, or the platform</div>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#94a3b8' }}>✕</button>
@@ -139,5 +147,6 @@ export default function AssistantPanel({
         </div>
       </div>
     </div>
+    </>
   )
 }
