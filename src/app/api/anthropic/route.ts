@@ -57,6 +57,18 @@ const TOOLS = [
     },
   },
   {
+    name: 'start_conversation_with_seller',
+    description: 'Start a direct anonymous conversation with a seller (or buyer) company about a specific listing or part. Use this when the user explicitly asks to contact, message, or reach out to a seller/buyer. Requires the company_id of the counterpart, which you get from search_listings or search_buy_intents results — but those results do not include company_id directly, so ask the user to confirm which specific listing they mean if there are multiple sellers, then use get_product_detail or search_listings again if needed to resolve it. If you cannot determine the counterpart company_id from available tools, tell the user you cannot start the conversation automatically and suggest they use the Ask button on the listing instead.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        counterpart_company_id: { type: 'string', description: 'The company_id of the seller or buyer to start a conversation with' },
+        product_id: { type: 'string', description: 'Optional product_id to attach to the conversation for context' },
+      },
+      required: ['counterpart_company_id'],
+    },
+  },
+  {
     name: 'check_demand_signal',
     description: 'Check how much cross-platform interest a part number has received recently — how many distinct companies (anonymised, no identities revealed) searched for it in the last 7 and 30 days. Use this when the user asks things like "is anyone else looking for this", "is this popular", or "has this been searched before".',
     input_schema: {
@@ -127,7 +139,7 @@ async function executeTool(name: string, input: any, companyId: string | undefin
       let query = supabaseAdmin
         .from('listings')
         .select(`
-          quantity, price, currency, condition, warehouse_location,
+          product_id, company_id, quantity, price, currency, condition, warehouse_location,
           manufacture_date, stock_entry_date, notes, created_at,
           product:product_id(normalized_pn, brand, description, lifecycle_status),
           company:company_id(name)
@@ -150,6 +162,8 @@ async function executeTool(name: string, input: any, companyId: string | undefin
         : 'No active listings found'
 
       return JSON.stringify((data as any[]).map(l => ({
+        product_id: l.product_id,
+        seller_company_id: l.company_id,
         pn: l.product?.normalized_pn,
         brand: l.product?.brand,
         description: l.product?.description,
@@ -234,6 +248,41 @@ async function executeTool(name: string, input: any, companyId: string | undefin
       })), null, 2)
     }
 
+    if (name === 'start_conversation_with_seller') {
+      const counterpartId = (input.counterpart_company_id || '').trim()
+      const myCompanyId = (input.__company_id || '').trim()
+      if (!counterpartId) return 'No counterpart company_id provided'
+      if (!myCompanyId) return 'Cannot start a conversation: missing requesting company_id'
+      if (counterpartId === myCompanyId) return 'Cannot start a conversation with your own company'
+
+      const { data: existing } = await supabaseAdmin
+        .from('conversations')
+        .select('id')
+        .or(`and(company_a.eq.${myCompanyId},company_b.eq.${counterpartId}),and(company_a.eq.${counterpartId},company_b.eq.${myCompanyId})`)
+        .maybeSingle()
+
+      let convId = existing?.id
+      if (!convId) {
+        const { data: created, error: createErr } = await supabaseAdmin
+          .from('conversations')
+          .insert({
+            company_a: myCompanyId,
+            company_b: counterpartId,
+            product_id: input.product_id || null,
+          })
+          .select('id')
+          .single()
+        if (createErr) return `Failed to start conversation: ${createErr.message}`
+        convId = created?.id
+      }
+
+      return JSON.stringify({
+        conversation_id: convId,
+        status: existing ? 'existing_conversation_found' : 'new_conversation_created',
+        note: 'Tell the user the conversation has been started and they can find it under My Messages.',
+      }, null, 2)
+    }
+
     if (name === 'check_demand_signal') {
       const pn = (input.pn || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
       if (!pn) return 'No part number provided'
@@ -277,6 +326,7 @@ You have live access to the ExchangeSpare platform database of 97,000+ products 
 You also receive the recent conversation history with this company on every request — this history is loaded from a persistent database and is NOT limited to the current browser session. This company's conversations with you are saved permanently and reloaded every time they reopen the assistant panel, even days later, even after closing the browser or restarting their computer. Treat this history as your own long-term memory of this company. Refer back to it naturally when relevant (e.g. "as I mentioned earlier", "you asked about this before"). NEVER claim you have no memory of past messages, NEVER claim conversations "reset" when the window closes, and NEVER claim you will not recognise this company next time — all of these claims are factually false in this system and must not be made.
 When asked about product availability, ALWAYS search the database first using the provided tools.
 When asked whether other companies have shown interest in a part, use check_demand_signal — never guess, and never reveal which specific company searched, only aggregate anonymised counts.
+When the user asks to contact, message, or start a conversation with a seller or buyer, first use search_listings or search_buy_intents to find the seller_company_id (or buyer's company_id), confirm with the user which specific listing/company they mean if there is more than one match, then call start_conversation_with_seller. After it succeeds, tell the user the conversation has started and they can find it under "My Messages" — do not claim you sent an actual chat message, only that the conversation thread now exists.
 Be concise and precise. Format prices and quantities clearly.
 When listings are found, show: seller, quantity, price, condition, location, listing date.
 When not found, say clearly and suggest searching by different PN variations.
@@ -290,11 +340,16 @@ Respond in the same language the user is writing in.`
     const toolUseBlocks = (response.content || []).filter((b: any) => b.type === 'tool_use')
 
     const toolResults = await Promise.all(
-      toolUseBlocks.map(async (block: any) => ({
-        type: 'tool_result' as const,
-        tool_use_id: block.id,
-        content: await executeTool(block.name, block.input, body.company_id),
-      }))
+      toolUseBlocks.map(async (block: any) => {
+        const input = block.name === 'start_conversation_with_seller'
+          ? { ...block.input, __company_id: body.company_id }
+          : block.input
+        return {
+          type: 'tool_result' as const,
+          tool_use_id: block.id,
+          content: await executeTool(block.name, input, body.company_id),
+        }
+      })
     )
 
     messages.push({ role: 'assistant', content: response.content })
