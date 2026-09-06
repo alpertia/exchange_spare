@@ -330,6 +330,7 @@ async function executeTool(name: string, input: any, companyId: string | undefin
 
 async function runWithTools(body: any): Promise<any> {
   const messages = [...(body.messages || [])]
+  let startedConversationId: string | null = null
   const companyLine = body.company_name
     ? `You are currently speaking with an employee of "${body.company_name}" — you know this company's name and may address them by it naturally (e.g. greet them, or say "as ${body.company_name}, you may already have..."). You do NOT know the individual employee's personal name.`
     : ''
