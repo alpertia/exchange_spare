@@ -14,6 +14,7 @@ export default function AssistantPanel({
   const [sending, setSending] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
+  const [conversationLink, setConversationLink] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -76,7 +77,7 @@ export default function AssistantPanel({
       const replyText = textBlocks.map((b: any) => b.text).join('\n').trim() || 'No response.'
 
       if (data._conversation_id) {
-        window.open(`/dashboard/messages?conversation=${data._conversation_id}`, '_blank')
+        setConversationLink(`/dashboard/messages?conversation=${data._conversation_id}`)
       }
 
       const assistantMsg: Msg = { id: crypto.randomUUID(), role: 'assistant', content: replyText }
@@ -146,6 +147,16 @@ export default function AssistantPanel({
                 </div>
               )}
             </div>
+
+            {conversationLink && (
+              <div style={{ padding: '10px 16px', background: '#eff6ff', borderTop: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <span style={{ fontSize: 12, color: '#1e40af' }}>💬 A conversation was started</span>
+                <a href={conversationLink} target="_blank" rel="noopener noreferrer"
+                  style={{ fontSize: 12, fontWeight: 700, color: 'white', background: '#1e40af', padding: '6px 12px', borderRadius: 6, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                  Open →
+                </a>
+              </div>
+            )}
 
             {errorMsg && (
               <div style={{ padding: '8px 16px', background: '#fef2f2', color: '#dc2626', fontSize: 12 }}>{errorMsg}</div>
