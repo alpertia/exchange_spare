@@ -106,6 +106,7 @@ async function logSearch(companyId: string | undefined, pn: string) {
 
 async function executeTool(name: string, input: any, companyId: string | undefined): Promise<string> {
   try {
+    await supabaseAdmin.from('debug_tool_calls').insert({ tool_name: name, input: input })
     if (name === 'search_products') {
       const q = (input.query || '').trim()
       const limit = input.limit || 10
