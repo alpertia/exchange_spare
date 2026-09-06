@@ -64,6 +64,7 @@ const TOOLS = [
       properties: {
         counterpart_company_id: { type: 'string', description: 'The company_id of the seller or buyer to start a conversation with' },
         product_id: { type: 'string', description: 'Optional product_id to attach to the conversation for context' },
+        opening_message: { type: 'string', description: 'A short, polite opening message to send, mentioning the part number and what the user wants (e.g. availability, price). Write this in the same language the user is using.' },
       },
       required: ['counterpart_company_id'],
     },
@@ -106,7 +107,6 @@ async function logSearch(companyId: string | undefined, pn: string) {
 
 async function executeTool(name: string, input: any, companyId: string | undefined): Promise<string> {
   try {
-    await supabaseAdmin.from('debug_tool_calls').insert({ tool_name: name, input: input })
     if (name === 'search_products') {
       const q = (input.query || '').trim()
       const limit = input.limit || 10
@@ -278,10 +278,17 @@ async function executeTool(name: string, input: any, companyId: string | undefin
         convId = created?.id
       }
 
+      await supabaseAdmin.from('messages').insert({
+        conversation_id: convId,
+        sender_company_id: myCompanyId,
+        receiver_company_id: counterpartId,
+        content: input.opening_message || 'Hello, I would like to discuss this listing.',
+      })
+
       return JSON.stringify({
         conversation_id: convId,
         status: existing ? 'existing_conversation_found' : 'new_conversation_created',
-        note: 'Tell the user the conversation has been started and they can find it under My Messages.',
+        note: 'An opening message was sent so this now appears at the top of My Messages for both companies. Tell the user the conversation has started.',
       }, null, 2)
     }
 
