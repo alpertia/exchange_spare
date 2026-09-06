@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
 type Conv = {
@@ -33,6 +34,8 @@ function hasContact(t: string) {
 }
 
 export default function MessagesPage() {
+  const searchParams = useSearchParams()
+  const targetConvId = searchParams.get('conversation')
   const [myId, setMyId] = useState<string | null>(null)
   const [myCode, setMyCode] = useState('')
   const [convs, setConvs] = useState<Conv[]>([])
@@ -91,6 +94,11 @@ export default function MessagesPage() {
     }))
     enriched.sort((a, b) => new Date(b.last_time).getTime() - new Date(a.last_time).getTime())
     setConvs(enriched)
+
+    if (targetConvId) {
+      const match = enriched.find((c: any) => c.id === targetConvId)
+      if (match) openConv(match)
+    }
   }
 
   async function openConv(conv: Conv) {

@@ -75,6 +75,10 @@ export default function AssistantPanel({
       const textBlocks = (data.content || []).filter((b: any) => b.type === 'text')
       const replyText = textBlocks.map((b: any) => b.text).join('\n').trim() || 'No response.'
 
+      if (data._conversation_id) {
+        window.open(`/dashboard/messages?conversation=${data._conversation_id}`, '_blank')
+      }
+
       const assistantMsg: Msg = { id: crypto.randomUUID(), role: 'assistant', content: replyText }
       setMessages(prev => [...prev, assistantMsg])
       await supabase.from('ai_chat_messages').insert({ company_id: companyId, role: 'assistant', content: replyText })

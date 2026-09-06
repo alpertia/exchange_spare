@@ -353,10 +353,17 @@ Respond in the same language the user is writing in.`
         const input = block.name === 'start_conversation_with_seller'
           ? { ...block.input, __company_id: body.company_id }
           : block.input
+        const resultStr = await executeTool(block.name, input, body.company_id)
+        if (block.name === 'start_conversation_with_seller') {
+          try {
+            const parsed = JSON.parse(resultStr)
+            if (parsed.conversation_id) startedConversationId = parsed.conversation_id
+          } catch {}
+        }
         return {
           type: 'tool_result' as const,
           tool_use_id: block.id,
-          content: await executeTool(block.name, input, body.company_id),
+          content: resultStr,
         }
       })
     )
@@ -366,6 +373,12 @@ Respond in the same language the user is writing in.`
     response = await callClaude({ ...body, system, messages, tools: TOOLS })
   }
 
+  if (startedConversationId) {
+    response._conversation_id = startedConversationId
+  }
+  if (startedConversationId) {
+    response._conversation_id = startedConversationId
+  }
   return response
 }
 
