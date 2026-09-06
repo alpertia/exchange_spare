@@ -257,7 +257,7 @@ async function executeTool(name: string, input: any, companyId: string | undefin
     if (name === 'start_conversation_with_seller') {
       const counterpartId = (input.counterpart_company_id || '').trim()
       const myCompanyId = (input.__company_id || '').trim()
-      console.error('DEBUG start_conversation_with_seller input:', JSON.stringify(input))
+      await supabaseAdmin.from('debug_tool_calls').insert({ tool_name: name, input: input })
       if (!counterpartId) return 'No counterpart company_id provided'
       if (!myCompanyId) return 'Cannot start a conversation: missing requesting company_id'
       if (counterpartId === myCompanyId) return 'Cannot start a conversation with your own company'
@@ -380,9 +380,6 @@ Respond in the same language the user is writing in.`
     response = await callClaude({ ...body, system, messages, tools: TOOLS })
   }
 
-  if (startedConversationId) {
-    response._conversation_id = startedConversationId
-  }
   if (startedConversationId) {
     response._conversation_id = startedConversationId
   }
