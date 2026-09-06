@@ -251,6 +251,7 @@ async function executeTool(name: string, input: any, companyId: string | undefin
     if (name === 'start_conversation_with_seller') {
       const counterpartId = (input.counterpart_company_id || '').trim()
       const myCompanyId = (input.__company_id || '').trim()
+      console.error('DEBUG start_conversation_with_seller input:', JSON.stringify(input))
       if (!counterpartId) return 'No counterpart company_id provided'
       if (!myCompanyId) return 'Cannot start a conversation: missing requesting company_id'
       if (counterpartId === myCompanyId) return 'Cannot start a conversation with your own company'
