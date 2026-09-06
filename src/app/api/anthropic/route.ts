@@ -6,6 +6,13 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+function dealerCode(id: string): string {
+  const day = new Date().toISOString().slice(0, 10)
+  let h = 2166136261
+  for (const c of id + day) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); h >>>= 0 }
+  return String((h % 9000) + 1000)
+}
+
 const TOOLS = [
   {
     name: 'search_products',
@@ -169,7 +176,7 @@ async function executeTool(name: string, input: any, companyId: string | undefin
         brand: l.product?.brand,
         description: l.product?.description,
         lifecycle: l.product?.lifecycle_status,
-        seller: l.company?.name,
+        seller: `Dealer ${dealerCode(l.company_id)}`,
         qty: l.quantity,
         price: l.price ? `${l.price} ${l.currency}` : 'price on request',
         condition: l.condition,
@@ -190,9 +197,8 @@ async function executeTool(name: string, input: any, companyId: string | undefin
       const { data: listingData } = await supabaseAdmin
         .from('listings')
         .select(`
-          quantity, price, currency, condition, warehouse_location,
-          manufacture_date, notes,
-          company:company_id(name)
+          company_id, quantity, price, currency, condition, warehouse_location,
+          manufacture_date, notes
         `)
         .eq('status', 'active')
         .eq('product_id', prodData.id)
@@ -201,7 +207,7 @@ async function executeTool(name: string, input: any, companyId: string | undefin
       return JSON.stringify({
         product: prodData,
         active_listings: (listingData || []).map((l: any) => ({
-          seller: l.company?.name,
+          seller: `Dealer ${dealerCode(l.company_id)}`,
           qty: l.quantity,
           price: l.price ? `${l.price} ${l.currency}` : 'on request',
           condition: l.condition,
@@ -227,9 +233,8 @@ async function executeTool(name: string, input: any, companyId: string | undefin
       let query = supabaseAdmin
         .from('listings')
         .select(`
-          quantity, price, currency, notes, created_at,
-          product:product_id(normalized_pn, brand, description),
-          company:company_id(name)
+          company_id, quantity, price, currency, notes, created_at,
+          product:product_id(normalized_pn, brand, description)
         `)
         .eq('status', 'active')
         .eq('type', 'buy')
@@ -242,7 +247,7 @@ async function executeTool(name: string, input: any, companyId: string | undefin
       return JSON.stringify((data as any[]).map(l => ({
         pn: l.product?.normalized_pn,
         brand: l.product?.brand,
-        buyer: l.company?.name,
+        buyer: `Dealer ${dealerCode(l.company_id)}`,
         qty_wanted: l.quantity,
         target_price: l.price ? `${l.price} ${l.currency}` : null,
         notes: l.notes,
